@@ -1,3 +1,4 @@
+import { migrateControllerOrigin } from "./controller-origin";
 import Constants from "expo-constants";
 import { createFullResponseLoader } from "./full-response";
 import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
@@ -81,11 +82,11 @@ export class ApiError extends Error {
 
 export function defaultControllerUrl(): string {
   const value = Constants.expoConfig?.extra?.tmuxMobileControllerUrl;
-  return normalizeBaseUrl(typeof value === "string" ? value : "https://eng.impo.ai");
+  return normalizeBaseUrl(typeof value === "string" ? value : "https://eng.xyznot.com");
 }
 
 export function normalizeBaseUrl(value: string): string {
-  let next = String(value || "https://eng.impo.ai").trim();
+  let next = String(value || "https://eng.xyznot.com").trim();
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(next)) {
     const local = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|\/|$)/i.test(next);
     next = `${local ? "http" : "https"}://${next}`;
@@ -94,7 +95,7 @@ export function normalizeBaseUrl(value: string): string {
   url.pathname = "/";
   url.search = "";
   url.hash = "";
-  return url.origin;
+  return migrateControllerOrigin(url.origin);
 }
 
 interface RequestOptions {

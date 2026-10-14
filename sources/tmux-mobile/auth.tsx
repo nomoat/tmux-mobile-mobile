@@ -1,3 +1,4 @@
+import { migrateControllerSession } from "./controller-origin";
 import * as React from "react";
 import * as Clipboard from "expo-clipboard";
 import * as SecureStore from "expo-secure-store";
@@ -72,7 +73,9 @@ async function loadStoredSession(): Promise<TmuxMobileSession | null> {
   try {
     const parsed = JSON.parse(raw) as TmuxMobileSession;
     if (!parsed.sessionToken || isExpired(parsed)) return null;
-    return parsed;
+    const migrated = migrateControllerSession(parsed);
+    if (migrated !== parsed) await saveSession(migrated).catch(() => {});
+    return migrated;
   } catch {
     return null;
   }

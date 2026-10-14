@@ -92,8 +92,8 @@ describe("resolvePaneComposerPresentation", () => {
 
 describe("normalizeSpokenControllerUrl", () => {
   it("maps the default controller phrases", () => {
-    expect(normalizeSpokenControllerUrl("eng dot impo dot ai")).toBe("https://eng.impo.ai");
-    expect(normalizeSpokenControllerUrl("production")).toBe("https://eng.impo.ai");
+    expect(normalizeSpokenControllerUrl("eng dot impo dot ai")).toBe("https://eng.xyznot.com");
+    expect(normalizeSpokenControllerUrl("production")).toBe("https://eng.xyznot.com");
   });
 
   it("normalizes a spoken custom host", () => {

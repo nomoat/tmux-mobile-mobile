@@ -1979,7 +1979,7 @@ function LoginScreen() {
     scopeKey: "login:controller-url",
     onText: (transcript) => setUrl(normalizeSpokenControllerUrl(transcript)),
     onStatus: setVoiceStatus,
-    contextualStrings: ["https", "eng.impo.ai", "production", "localhost"],
+    contextualStrings: ["https", "eng.xyznot.com", "production", "localhost"],
   });
 
   return (
@@ -1998,7 +1998,7 @@ function LoginScreen() {
           <VoiceValueField
             label="Controller"
             value={url}
-            emptyLabel="Say “production” for eng.impo.ai"
+            emptyLabel="Say “production” for eng.xyznot.com"
             active={controllerVoice.active}
             status={voiceStatus}
             onToggle={() => {
@@ -2019,7 +2019,7 @@ function LoginScreen() {
               autoCorrect={false}
               keyboardType="url"
               style={styles.textInput}
-              placeholder="https://eng.impo.ai"
+              placeholder="https://eng.xyznot.com"
               placeholderTextColor={theme.colors.textMuted}
             />
           </View>
