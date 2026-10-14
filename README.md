@@ -30,7 +30,7 @@ yarn ios
 yarn typecheck
 ```
 
-The default controller is `https://eng.impo.ai`. Override it at build time with:
+The default controller is `https://eng.xyznot.com`. Override it at build time with:
 
 ```bash
 TMUX_MOBILE_CONTROLLER_URL=https://example.com yarn dev

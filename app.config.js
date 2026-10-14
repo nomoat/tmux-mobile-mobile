@@ -102,7 +102,7 @@ export default {
       jsVersion,
       buildTime,
       tmuxMobileControllerUrl:
-        process.env.TMUX_MOBILE_CONTROLLER_URL || "https://eng.impo.ai",
+        process.env.TMUX_MOBILE_CONTROLLER_URL || "https://eng.xyznot.com",
       eas: {
         projectId: "649f50ed-e509-4fbc-9d23-a8c9080ba635",
       },

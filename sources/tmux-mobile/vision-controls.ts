@@ -74,7 +74,7 @@ export function normalizeSpokenControllerUrl(transcript: string): string {
     lowered.includes("正式") ||
     (lowered.includes("eng") && lowered.includes("impo") && lowered.includes("ai"))
   ) {
-    return "https://eng.impo.ai";
+    return "https://eng.xyznot.com";
   }
 
   const compact = lowered
