@@ -8,8 +8,9 @@ import type { TmuxMobileApi } from './api';
 import { draftNavigationAllowed, validateDraftHandoff } from './drafts-navigation';
 
 // Mounted only while open: closing also destroys the WebView and pending work.
-export function DraftsModal({ api, theme, onClose }: {
+export function DraftsModal({ api, initialPath, theme, onClose }: {
   api: TmuxMobileApi;
+  initialPath: string;
   theme: AppTheme;
   onClose: () => void;
 }) {
@@ -26,13 +27,13 @@ export function DraftsModal({ api, theme, onClose }: {
     setError('');
     setLoading(true);
     setCanGoBack(false);
-    api.browserHandoff('/drafts?embedded=1').then(handoff => {
+    api.browserHandoff(initialPath).then(handoff => {
       if (active) setSource({ uri: validateDraftHandoff(api.baseUrl, handoff.handoffUrl) });
     }).catch(reason => {
       if (active) { setError(reason instanceof Error ? reason.message : String(reason)); setLoading(false); }
     });
     return () => { active = false; };
-  }, [api, attempt]);
+  }, [api, initialPath, attempt]);
   const themeScript = `try { localStorage.setItem('tmux-mobile-theme', JSON.stringify({theme:${JSON.stringify(theme.dark ? 'dark' : 'kami')}})); document.documentElement.dataset.theme=${JSON.stringify(theme.dark ? 'dark' : 'kami')}; } catch (_) {} true;`;
   React.useEffect(() => { browser.current?.injectJavaScript(themeScript); }, [themeScript]);
   const back = () => canGoBack ? browser.current?.goBack() : onClose();

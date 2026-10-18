@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { draftNavigationAllowed, validateDraftHandoff } from './drafts-navigation';
+import { draftNavigationAllowed, validateDraftHandoff, sessionDraftsPath } from './drafts-navigation';
 describe('embedded Drafts navigation', () => {
   const base = 'https://eng.xyznot.com';
   it('exchanges the app login through the same controller only', () => {
@@ -15,4 +15,14 @@ describe('embedded Drafts navigation', () => {
     expect(draftNavigationAllowed(base,'javascript:alert(1)')).toBe(false);
     expect(draftNavigationAllowed(base,'file:///private/data')).toBe(false);
   });
+});
+
+it('opens only the selected Agent session, never guesses a missing identity', () => {
+  for (const kind of ['codex', 'claude', 'pi'] as const) {
+    const url = new URL(sessionDraftsPath({machineId:'machine-123',kind,agentSessionId:'conversation-456'})!, 'https://eng.xyznot.com');
+    expect(url.pathname).toBe('/drafts');
+    expect(Object.fromEntries(url.searchParams)).toEqual({machineId:'machine-123',kind,sessionId:'conversation-456',embedded:'1'});
+  }
+  expect(sessionDraftsPath({machineId:'machine-123',kind:'codex'})).toBeNull();
+  expect(sessionDraftsPath({kind:'pi',agentSessionId:'conversation-456'})).toBeNull();
 });

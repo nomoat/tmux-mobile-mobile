@@ -26,6 +26,7 @@ describe("Command Center card action parity", () => {
       'label="Transcript"',
       'label="Conversation"',
       'label="Copy conversation link"',
+      'label="Drafts"',
       'label="Rename window"',
       'label={reading ? "Stop reading" : "Read aloud"}',
       'label="Open terminal"',
