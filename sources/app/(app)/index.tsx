@@ -1,3 +1,4 @@
+import { DraftsModal } from "@/tmux-mobile/drafts-modal";
 import { NotificationSettings } from "@/tmux-mobile/notification-settings";
 import { conversationPath } from "@/tmux-mobile/conversation-link";
 import * as React from "react";
@@ -852,6 +853,7 @@ function CommandCenterScreen() {
   }, []);
   const [cardSearchVisible, setCardSearchVisible] = React.useState(false);
   const [pinsVisible, setPinsVisible] = React.useState(false);
+  const [draftsVisible, setDraftsVisible] = React.useState(false);
   const [settingsVisible, setSettingsVisible] = React.useState(false);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentSession | null>(null);
   const [expandedAgentKey, setExpandedAgentKey] = React.useState("");
@@ -1274,6 +1276,7 @@ function CommandCenterScreen() {
       menuVisible ||
       cardSearchVisible ||
       pinsVisible ||
+      draftsVisible ||
       settingsVisible,
   );
 
@@ -1451,6 +1454,7 @@ function CommandCenterScreen() {
         else if (menuVisible) setMenuVisible(false);
         else if (cardSearchVisible) setCardSearchVisible(false);
         else if (pinsVisible) setPinsVisible(false);
+        else if (draftsVisible) setDraftsVisible(false);
         else if (settingsVisible) setSettingsVisible(false);
         else return;
         e.preventDefault?.();
@@ -1518,6 +1522,7 @@ function CommandCenterScreen() {
       modalOpen,
       moveSelectedAgent,
       pinsVisible,
+      draftsVisible,
       readShortcutAgent,
       renameTarget,
       refreshCommandCenter,
@@ -1656,6 +1661,11 @@ function CommandCenterScreen() {
           </View>
         </View>
         <View style={styles.headerButtons}>
+          <IconButton
+            label="Drafts"
+            icon={<FileText size={19} color={theme.colors.text} />}
+            onPress={() => setDraftsVisible(true)}
+          />
           <IconButton
             label="Refresh"
             icon={<RefreshCcw size={19} color={theme.colors.text} />}
@@ -1925,6 +1935,7 @@ function CommandCenterScreen() {
         }}
         onClose={() => setCardSearchVisible(false)}
       />
+      {draftsVisible && api ? <DraftsModal api={api} theme={theme} onClose={() => setDraftsVisible(false)} /> : null}
       <PinnedArtifactsModal visible={pinsVisible} onClose={() => setPinsVisible(false)} />
       <SettingsModal
         visible={settingsVisible}
