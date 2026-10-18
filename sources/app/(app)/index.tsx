@@ -1,3 +1,4 @@
+import { sessionDraftsPath } from "@/tmux-mobile/drafts-navigation";
 import { DraftsModal } from "@/tmux-mobile/drafts-modal";
 import { NotificationSettings } from "@/tmux-mobile/notification-settings";
 import { conversationPath } from "@/tmux-mobile/conversation-link";
@@ -852,7 +853,7 @@ function CommandCenterScreen() {
   }, []);
   const [cardSearchVisible, setCardSearchVisible] = React.useState(false);
   const [pinsVisible, setPinsVisible] = React.useState(false);
-  const [draftsVisible, setDraftsVisible] = React.useState(false);
+  const [draftsPath, setDraftsPath] = React.useState<string | null>(null);
   const [settingsVisible, setSettingsVisible] = React.useState(false);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentSession | null>(null);
   const [expandedAgentKey, setExpandedAgentKey] = React.useState("");
@@ -1275,7 +1276,7 @@ function CommandCenterScreen() {
       menuVisible ||
       cardSearchVisible ||
       pinsVisible ||
-      draftsVisible ||
+      draftsPath ||
       settingsVisible,
   );
 
@@ -1453,7 +1454,7 @@ function CommandCenterScreen() {
         else if (menuVisible) setMenuVisible(false);
         else if (cardSearchVisible) setCardSearchVisible(false);
         else if (pinsVisible) setPinsVisible(false);
-        else if (draftsVisible) setDraftsVisible(false);
+        else if (draftsPath) setDraftsPath(null);
         else if (settingsVisible) setSettingsVisible(false);
         else return;
         e.preventDefault?.();
@@ -1521,7 +1522,7 @@ function CommandCenterScreen() {
       modalOpen,
       moveSelectedAgent,
       pinsVisible,
-      draftsVisible,
+      draftsPath,
       readShortcutAgent,
       renameTarget,
       refreshCommandCenter,
@@ -1663,7 +1664,7 @@ function CommandCenterScreen() {
           <IconButton
             label="Drafts"
             icon={<FileText size={19} color={theme.colors.text} />}
-            onPress={() => setDraftsVisible(true)}
+            onPress={() => setDraftsPath("/drafts?embedded=1")}
           />
           <IconButton
             label="Refresh"
@@ -1827,6 +1828,10 @@ function CommandCenterScreen() {
                         responseCopied={copiedResponseKey === key}
                         responsePinning={pinningResponseKey === key}
                         reading={activeReadAgentKey === key}
+                        onDrafts={() => {
+                          const path = sessionDraftsPath(item);
+                          if (path) setDraftsPath(path);
+                        }}
                         onConversation={() => {
                           const path = conversationPath(item);
                           if (api && path) openAuthenticatedControllerUrl(api, api.url(path).toString())
@@ -1934,7 +1939,7 @@ function CommandCenterScreen() {
         }}
         onClose={() => setCardSearchVisible(false)}
       />
-      {draftsVisible && api ? <DraftsModal api={api} theme={theme} onClose={() => setDraftsVisible(false)} /> : null}
+      {draftsPath && api ? <DraftsModal api={api} initialPath={draftsPath} theme={theme} onClose={() => setDraftsPath(null)} /> : null}
       <PinnedArtifactsModal visible={pinsVisible} onClose={() => setPinsVisible(false)} />
       <SettingsModal
         visible={settingsVisible}
@@ -2490,6 +2495,7 @@ function AgentCard({
   responsePinning,
   reading,
   onTranscript,
+  onDrafts,
   onConversation,
   onCopyConversation,
 }: {
@@ -2516,6 +2522,7 @@ function AgentCard({
   responsePinning: boolean;
   reading: boolean;
   onTranscript: () => void;
+  onDrafts: () => void;
   onConversation: () => void;
   onCopyConversation: () => void;
 }) {
@@ -2734,6 +2741,13 @@ function AgentCard({
                 onPress={onCopyConversation}
               />
             </> : null}
+            {sessionDraftsPath(agent) ? (
+              <ActionButton
+                icon={<FileText size={16} color={theme.colors.textMuted} />}
+                label="Drafts"
+                onPress={onDrafts}
+              />
+            ) : null}
             <ActionButton
               icon={<PencilLine size={16} color={theme.colors.textMuted} />}
               label="Rename window"

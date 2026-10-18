@@ -1,3 +1,10 @@
+import type { AgentSession } from './types';
+
+export function sessionDraftsPath(agent: Pick<AgentSession, 'machineId' | 'kind' | 'agentSessionId'>): string | null {
+  if (!agent.machineId || !agent.agentSessionId || !['codex', 'claude', 'pi'].includes(agent.kind || '')) return null;
+  return `/drafts?${new URLSearchParams({ machineId: agent.machineId, kind: agent.kind!, sessionId: agent.agentSessionId, embedded: '1' })}`;
+}
+
 export function validateDraftHandoff(baseUrl: string, handoffUrl: string): string {
   if (!handoffUrl) throw new Error('Could not open Drafts. Try again.');
   const url = new URL(handoffUrl, baseUrl);
