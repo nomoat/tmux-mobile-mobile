@@ -1,3 +1,5 @@
+import { terminalShareRequest, type TerminalShareAction, type TerminalShareState } from "./terminal-share";
+import type { AgentSession } from "./types";
 import { migrateControllerOrigin } from "./controller-origin";
 import Constants from "expo-constants";
 import { createFullResponseLoader } from "./full-response";
@@ -419,6 +421,10 @@ export class TmuxMobileApi {
       },
       body: base64ToArrayBuffer(base64),
     });
+  }
+
+  terminalShare(agent: AgentSession, action: TerminalShareAction, ttlSeconds = 86400, allowControl = false, signal?: AbortSignal): Promise<TerminalShareState> {
+    return this.request('/api/terminal-share', { ...terminalShareRequest(agent, action, ttlSeconds, allowControl), signal });
   }
 
   windowView(machineId: string, windowId: string, lines = 120): Promise<WindowViewResponse> {

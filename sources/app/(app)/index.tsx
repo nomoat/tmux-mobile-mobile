@@ -1,3 +1,5 @@
+import { TerminalShareModal } from "@/tmux-mobile/terminal-share-modal";
+import { canShareTerminal } from "@/tmux-mobile/terminal-share";
 import { sessionDraftsPath } from "@/tmux-mobile/drafts-navigation";
 import { DraftsModal } from "@/tmux-mobile/drafts-modal";
 import { NotificationSettings } from "@/tmux-mobile/notification-settings";
@@ -72,6 +74,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Globe,
   CloudDownload,
   Copy,
   Edit3,
@@ -855,6 +858,7 @@ function CommandCenterScreen() {
   }, []);
   const [cardSearchVisible, setCardSearchVisible] = React.useState(false);
   const [pinsVisible, setPinsVisible] = React.useState(false);
+  const [shareTarget, setShareTarget] = React.useState<AgentSession | null>(null);
   const [draftsPath, setDraftsPath] = React.useState<string | null>(null);
   const [settingsVisible, setSettingsVisible] = React.useState(false);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentSession | null>(null);
@@ -1278,6 +1282,7 @@ function CommandCenterScreen() {
       menuVisible ||
       cardSearchVisible ||
       pinsVisible ||
+      shareTarget ||
       draftsPath ||
       settingsVisible,
   );
@@ -1446,7 +1451,8 @@ function CommandCenterScreen() {
         // A hardware Escape key belongs to the embedded terminal while it is
         // active. The terminal sheet has an explicit close button.
         if (sshTarget) return;
-        if (fileTarget) setFileTarget(null);
+        if (shareTarget) setShareTarget(null);
+        else if (fileTarget) setFileTarget(null);
         else if (transcriptTarget) setTranscriptTarget(null);
         else if (responseTarget) setResponseTarget(null);
         else if (viewTarget) setViewTarget(null);
@@ -1524,6 +1530,7 @@ function CommandCenterScreen() {
       modalOpen,
       moveSelectedAgent,
       pinsVisible,
+      shareTarget,
       draftsPath,
       readShortcutAgent,
       renameTarget,
@@ -1830,6 +1837,7 @@ function CommandCenterScreen() {
                         responseCopied={copiedResponseKey === key}
                         responsePinning={pinningResponseKey === key}
                         reading={activeReadAgentKey === key}
+                        onShareTerminal={() => setShareTarget(item)}
                         onDrafts={() => {
                           const path = sessionDraftsPath(item);
                           if (path) setDraftsPath(path);
@@ -1941,6 +1949,7 @@ function CommandCenterScreen() {
         }}
         onClose={() => setCardSearchVisible(false)}
       />
+      {shareTarget && api ? <TerminalShareModal key={agentCardKey(shareTarget)} api={api} target={shareTarget} theme={theme} onClose={() => setShareTarget(null)} /> : null}
       {draftsPath && api ? <DraftsModal api={api} initialPath={draftsPath} theme={theme} onClose={() => setDraftsPath(null)} /> : null}
       <PinnedArtifactsModal visible={pinsVisible} onClose={() => setPinsVisible(false)} />
       <SettingsModal
@@ -2506,6 +2515,7 @@ function AgentCard({
   onDrafts,
   onConversation,
   onCopyConversation,
+  onShareTerminal,
 }: {
   agent: AgentSession;
   nowMs: number;
@@ -2533,6 +2543,7 @@ function AgentCard({
   onDrafts: () => void;
   onConversation: () => void;
   onCopyConversation: () => void;
+  onShareTerminal: () => void;
 }) {
   const theme = useAppTheme();
   const styles = useAppStyles();
@@ -2779,6 +2790,11 @@ function AgentCard({
               label="Open terminal"
               onPress={onView}
             />
+            {canShareTerminal(agent) ? <ActionButton
+              icon={<Globe size={16} color={theme.colors.textMuted} />}
+              label="Share terminal"
+              onPress={onShareTerminal}
+            /> : null}
             <ActionButton
               icon={<Trash2 size={16} color={theme.colors.textMuted} />}
               label="Complete and delete window"
@@ -5888,6 +5904,7 @@ function WindowViewModal({
   const [terminalText, setTerminalText] = React.useState("");
   const [terminalInput, setTerminalInput] = React.useState("");
   const [terminalKeyboardVisible, setTerminalKeyboardVisible] = React.useState(false);
+  const [terminalShareTarget, setTerminalShareTarget] = React.useState<AgentSession | null>(null);
   const [terminalUploadPickerVisible, setTerminalUploadPickerVisible] = React.useState(false);
   const [terminalUploading, setTerminalUploading] = React.useState(false);
   const [terminalFollow, setTerminalFollow] = React.useState(true);
@@ -5901,6 +5918,7 @@ function WindowViewModal({
   const [loading, setLoading] = React.useState(false);
   const terminalAutoFocus = windowWidth >= 760;
   const terminalTargetKey = target ? agentCardKey(target) : "";
+  React.useEffect(() => { setTerminalShareTarget(null); }, [terminalTargetKey]);
   const previousTerminalTargetKeyRef = React.useRef("");
   const terminalTextScaleRef = React.useRef(1);
   const terminalPinchBaseRef = React.useRef(1);
@@ -6558,6 +6576,7 @@ function WindowViewModal({
       wide
       fullscreen
     >
+      {terminalShareTarget && api ? <TerminalShareModal key={agentCardKey(terminalShareTarget)} api={api} target={terminalShareTarget} theme={theme} onClose={() => setTerminalShareTarget(null)} /> : null}
       {fileBrowserVisible ? fileBrowserScreen : (
         <>
       <View style={styles.sessionScreenMetaBar}>
@@ -6570,6 +6589,11 @@ function WindowViewModal({
           </Text>
         </View>
         <View style={styles.sessionScreenActions}>
+          {target && canShareTerminal(target) ? <ActionButton
+            icon={<Globe size={16} color={theme.colors.textMuted} />}
+            label="Share terminal"
+            onPress={() => { Keyboard.dismiss(); setTerminalShareTarget(target); }}
+          /> : null}
           {target && onOpenSsh ? (
             <ActionButton
               icon={<KeyRound size={16} color={theme.colors.textMuted} />}

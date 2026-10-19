@@ -30,6 +30,7 @@ describe("Command Center card action parity", () => {
       'label="Rename window"',
       'label={reading ? "Stop reading" : "Read aloud"}',
       'label="Open terminal"',
+      'label="Share terminal"',
       'label="Complete and delete window"',
     ]);
     expect(cardSource).toContain("<Send");
