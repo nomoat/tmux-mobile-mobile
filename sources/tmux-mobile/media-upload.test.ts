@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_UPLOAD_BYTES, MEDIA_LIBRARY_OPTIONS, mediaUploadAsset } from "./media-upload";
+import { MEDIA_LIBRARY_OPTIONS, mediaUploadAsset } from "./media-upload";
 import { getInfoAsync, readAsStringAsync } from "expo-file-system/legacy";
 import { TmuxMobileApi } from "./api";
 
@@ -33,18 +33,8 @@ describe("photo and video uploads", () => {
       .toEqual({ uri: "content://library/42", name: "42", mimeType: "application/octet-stream" });
   });
 
-  it("rejects oversized videos before reading their bytes or making a request", async () => {
-    vi.mocked(getInfoAsync).mockResolvedValue({ exists: true, uri: "file:///clip.mov", isDirectory: false, modificationTime: 0, size: MAX_UPLOAD_BYTES + 1 });
-    const api = new TmuxMobileApi("https://eng.xyznot.com");
-    const request = vi.spyOn(api, "request");
-    await expect(api.uploadFile("machine", "%3", { uri: "file:///clip.mov", name: "clip.mov", type: "video/quicktime" }))
-      .rejects.toThrow("25 MB upload limit");
-    expect(readAsStringAsync).not.toHaveBeenCalled();
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it("sends video bytes, name and MIME type to the original target", async () => {
-    vi.mocked(getInfoAsync).mockResolvedValue({ exists: true, uri: "file:///clip.mov", isDirectory: false, modificationTime: 0, size: MAX_UPLOAD_BYTES });
+  it.each([25 * 1024 * 1024 + 1, 2 * 1024 * 1024 * 1024])("does not reject a %i-byte video by size and sends its bytes and metadata", async (size) => {
+    vi.mocked(getInfoAsync).mockResolvedValue({ exists: true, uri: "file:///clip.mov", isDirectory: false, modificationTime: 0, size });
     vi.mocked(readAsStringAsync).mockResolvedValue("AAECAw==");
     const api = new TmuxMobileApi("https://eng.xyznot.com");
     const request = vi.spyOn(api, "request").mockResolvedValue({ path: "/tmp/clip.mov" });

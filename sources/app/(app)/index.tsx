@@ -5061,7 +5061,7 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
           </View>
           <View style={styles.uploadChoiceTextBlock}>
             <Text style={styles.uploadChoiceTitle}>Photos & videos</Text>
-            <Text style={styles.uploadChoiceSubtitle}>Choose from your library · Up to 25 MB each</Text>
+            <Text style={styles.uploadChoiceSubtitle}>Choose from your library</Text>
           </View>
         </Pressable>
         <Pressable
@@ -6737,7 +6737,7 @@ function WindowViewModal({
           </View>
           <View style={styles.uploadChoiceTextBlock}>
             <Text style={styles.uploadChoiceTitle}>Photos & videos</Text>
-            <Text style={styles.uploadChoiceSubtitle}>Choose from your library · Up to 25 MB each</Text>
+            <Text style={styles.uploadChoiceSubtitle}>Choose from your library</Text>
           </View>
         </Pressable>
         <Pressable

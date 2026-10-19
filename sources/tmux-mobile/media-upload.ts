@@ -6,9 +6,6 @@ export const MEDIA_LIBRARY_OPTIONS: ImagePickerOptions = {
   quality: 1,
 };
 
-// Matches the Controller's /api/upload limit. Check before reading into memory.
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-
 const MIME_TYPES: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
   webp: "image/webp", heic: "image/heic", heif: "image/heif", avif: "image/avif",
