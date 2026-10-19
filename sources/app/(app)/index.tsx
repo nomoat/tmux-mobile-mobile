@@ -3185,17 +3185,11 @@ function UpdateNoticeBanner({
           : theme.colors.accent;
   const backgroundColor =
     notice.tone === "danger"
-      ? theme.dark
-        ? "#321d1d"
-        : "#fff0f0"
+      ? theme.colors.dangerSoft
       : notice.tone === "success"
-        ? theme.dark
-          ? "#182a1a"
-          : "#edf8ed"
+        ? theme.colors.successSoft
         : notice.tone === "warning"
-          ? theme.dark
-            ? "#302713"
-            : "#fff7df"
+          ? theme.colors.warningSoft
           : theme.colors.surfaceRaised;
   const icon =
     notice.tone === "danger" ? (
@@ -8967,7 +8961,7 @@ function createStyles(
     borderColor: theme.colors.border,
   },
   starButtonActive: {
-    backgroundColor: theme.dark ? "#3a2f16" : "#fff7e0",
+    backgroundColor: theme.colors.warningSoft,
     borderColor: theme.colors.warning,
   },
 	starButtonCollapsed: {
@@ -9844,7 +9838,7 @@ function createStyles(
     backgroundColor: theme.colors.surfaceRaised,
   },
   sshRailButtonDanger: {
-    borderColor: theme.dark ? "#704848" : "#e5b9b9",
+    borderColor: theme.colors.danger,
   },
   sshRailButtonText: {
     ...theme.typography.meta,
@@ -10458,7 +10452,7 @@ function createStyles(
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.danger,
-    backgroundColor: theme.dark ? "#321d1d" : "#fff0f0",
+    backgroundColor: theme.colors.dangerSoft,
     padding: 10,
     flexDirection: "row",
     alignItems: "center",
