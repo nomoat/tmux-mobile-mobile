@@ -1,7 +1,8 @@
 import { migrateControllerOrigin } from "./controller-origin";
 import Constants from "expo-constants";
 import { createFullResponseLoader } from "./full-response";
-import { EncodingType, readAsStringAsync } from "expo-file-system/legacy";
+import { EncodingType, getInfoAsync, readAsStringAsync } from "expo-file-system/legacy";
+import { MAX_UPLOAD_BYTES } from "./media-upload";
 import { toByteArray } from "base64-js";
 import type {
   AgentFileResponse,
@@ -388,6 +389,11 @@ export class TmuxMobileApi {
     paneId: string,
     file: UploadFileInput,
   ): Promise<UploadFileResponse> {
+    const info = await getInfoAsync(file.uri);
+    if (!info.exists) throw new Error("The selected file is no longer available. Please select it again.");
+    if (info.size > MAX_UPLOAD_BYTES) {
+      throw new Error(`${file.name || "This file"} exceeds the 25 MB upload limit. Choose a smaller file or a shorter video.`);
+    }
     const base64 = await readAsStringAsync(file.uri, { encoding: EncodingType.Base64 });
     const params = new URLSearchParams({
       paneId,

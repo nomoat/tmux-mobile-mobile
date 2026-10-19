@@ -32,6 +32,7 @@ import Constants from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { MEDIA_LIBRARY_OPTIONS, mediaUploadAsset } from "@/tmux-mobile/media-upload";
 import * as SecureStore from "expo-secure-store";
 import {
   setAudioModeAsync,
@@ -4895,26 +4896,18 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
     }
   }, [appendText, target, uploadFile]);
 
-  const pickImages = React.useCallback(async () => {
+  const pickMedia = React.useCallback(async () => {
     setStatus("");
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setStatus("Photos permission denied");
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync(MEDIA_LIBRARY_OPTIONS);
     if (result.canceled || result.assets.length === 0) return;
     await uploadAssets(
-      result.assets.map((asset) => ({
-        uri: asset.uri,
-        name: asset.fileName || asset.uri.split("/").pop() || `image-${Date.now()}.jpg`,
-        mimeType: asset.mimeType || "image/jpeg",
-      })),
-      "image",
+      result.assets.map(mediaUploadAsset),
+      "file",
     );
   }, [uploadAssets]);
 
@@ -5057,7 +5050,7 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
           style={[styles.uploadChoiceButton, uploading ? styles.disabledButton : null]}
           disabled={uploading || !target}
           onPress={() => {
-            pickImages().catch((error) => {
+            pickMedia().catch((error) => {
               setUploadPickerVisible(false);
               setStatus(error instanceof Error ? error.message : String(error));
             });
@@ -5067,8 +5060,8 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
             <ImagePlus size={20} color={theme.colors.text} />
           </View>
           <View style={styles.uploadChoiceTextBlock}>
-            <Text style={styles.uploadChoiceTitle}>Image</Text>
-            <Text style={styles.uploadChoiceSubtitle}>Choose photos from the library</Text>
+            <Text style={styles.uploadChoiceTitle}>Photos & videos</Text>
+            <Text style={styles.uploadChoiceSubtitle}>Choose from your library · Up to 25 MB each</Text>
           </View>
         </Pressable>
         <Pressable
@@ -6279,26 +6272,18 @@ function WindowViewModal({
     }
   }, [appendTerminalInput, target, uploadFile]);
 
-  const pickTerminalImages = React.useCallback(async () => {
+  const pickTerminalMedia = React.useCallback(async () => {
     setStatus("");
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setStatus("Photos permission denied");
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync(MEDIA_LIBRARY_OPTIONS);
     if (result.canceled || result.assets.length === 0) return;
     await uploadTerminalAssets(
-      result.assets.map((asset) => ({
-        uri: asset.uri,
-        name: asset.fileName || asset.uri.split("/").pop() || `image-${Date.now()}.jpg`,
-        mimeType: asset.mimeType || "image/jpeg",
-      })),
-      "image",
+      result.assets.map(mediaUploadAsset),
+      "file",
     );
   }, [uploadTerminalAssets]);
 
@@ -6741,7 +6726,7 @@ function WindowViewModal({
           style={[styles.uploadChoiceButton, terminalUploading ? styles.disabledButton : null]}
           disabled={terminalUploading || !target}
           onPress={() => {
-            pickTerminalImages().catch((err) => {
+            pickTerminalMedia().catch((err) => {
               setTerminalUploadPickerVisible(false);
               setStatus(err instanceof Error ? err.message : String(err));
             });
@@ -6751,8 +6736,8 @@ function WindowViewModal({
             <ImagePlus size={20} color={theme.colors.text} />
           </View>
           <View style={styles.uploadChoiceTextBlock}>
-            <Text style={styles.uploadChoiceTitle}>Image</Text>
-            <Text style={styles.uploadChoiceSubtitle}>Choose photos from the library</Text>
+            <Text style={styles.uploadChoiceTitle}>Photos & videos</Text>
+            <Text style={styles.uploadChoiceSubtitle}>Choose from your library · Up to 25 MB each</Text>
           </View>
         </Pressable>
         <Pressable
