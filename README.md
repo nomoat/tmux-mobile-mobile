@@ -61,3 +61,10 @@ Runtime 6 Android receives the styling-only backport on
 `release/paper-style-runtime6`, built from its existing lockfile. Runtime 7
 gets the new native APK/TestFlight icon and splash screen. Do not relabel
 runtime 7 JavaScript as runtime 6.
+
+## Solarized palette (2026-10-19)
+
+Web, iOS and Android now share Solarized Light/Dark colors. Native tokens live
+in `sources/theme.ts`; layout, typography and saved Auto/Light/Dark preferences
+are preserved. These JavaScript color changes ship through production OTA for
+runtime 7 (iOS/Android) and the existing runtime 6 Android backport.
