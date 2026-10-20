@@ -7,7 +7,7 @@ afterEach(() => vi.unstubAllGlobals());
 const agent = { machineId: 'machine-1', paneId: '%3', windowId: '@2', mux: 'tmux' };
 const viewerUrl = 'https://share.xyznot.com/s/11111111-1111-4111-8111-111111111111#viewer-capability';
 describe('native terminal sharing', () => {
-  it.each([86400, 432000, 604800])('routes a %i-second share to the captured machine and pane with owner authentication', async ttl => {
+  it.each([600, 86400, 432000, 604800])('routes a %i-second share to the captured machine and pane with owner authentication', async ttl => {
     const fetch = vi.fn().mockResolvedValue(Response.json({ viewerUrl, ttlSeconds: ttl, allowControl: true }));
     vi.stubGlobal('fetch', fetch);
     const result = await new TmuxMobileApi('https://eng.xyznot.com', 'owner-token').terminalShare(agent, 'start', ttl, true);
@@ -17,11 +17,11 @@ describe('native terminal sharing', () => {
     expect(JSON.parse(init.body)).toEqual({ action: 'start', paneId: '%3', ttlSeconds: ttl, allowControl: true });
     expect(terminalShareUrl(result)).toBe(viewerUrl);
   });
-  it('defaults to 24 hours and view only, supports window-only targets and explicit stop', async () => {
+  it('defaults to 24 hours with control, supports window-only targets and explicit stop', async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json({ ok: true })); vi.stubGlobal('fetch', fetch);
     const api = new TmuxMobileApi();
     await api.terminalShare({ machineId: 'm', windowId: '@8' }, 'start');
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ action: 'start', windowId: '@8', ttlSeconds: 86400, allowControl: false });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ action: 'start', windowId: '@8', ttlSeconds: 86400, allowControl: true });
     await api.terminalShare(agent, 'stop');
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ action: 'stop', paneId: '%3' });
   });

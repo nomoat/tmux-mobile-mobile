@@ -5,15 +5,18 @@ import { ChevronLeft, RefreshCcw, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppTheme } from '@/theme';
 import type { TmuxMobileApi } from './api';
+import { temporaryTerminalNavigationAllowed } from './temporary-terminal-navigation';
 import { draftNavigationAllowed, validateDraftHandoff } from './drafts-navigation';
 
 // Mounted only while open: closing also destroys the WebView and pending work.
-export function DraftsModal({ api, initialPath, theme, onClose }: {
+export function DraftsModal({ api, initialPath, theme, onClose, page = 'drafts' }: {
   api: TmuxMobileApi;
   initialPath: string;
+  page?: 'drafts' | 'terminal';
   theme: AppTheme;
   onClose: () => void;
 }) {
+  const title = page === 'terminal' ? 'Temporary terminal' : 'Drafts';
   const insets = useSafeAreaInsets();
   const browser = React.useRef<WebView>(null);
   const [source, setSource] = React.useState<{ uri: string } | null>(null);
@@ -45,13 +48,13 @@ export function DraftsModal({ api, initialPath, theme, onClose }: {
       <View style={[styles.screen, { backgroundColor: theme.colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           {control('Back', <ChevronLeft size={22} color={theme.colors.text} />, back)}
-          <Text style={[styles.title, theme.typography.section, { color: theme.colors.text }]}>Drafts</Text>
+          <Text style={[styles.title, theme.typography.section, { color: theme.colors.text }]}>{title}</Text>
           {loading ? <ActivityIndicator color={theme.colors.accent} /> : null}
-          {control('Refresh drafts', <RefreshCcw size={19} color={theme.colors.text} />, () => {
+          {control(`Refresh ${title.toLowerCase()}`,  <RefreshCcw size={19} color={theme.colors.text} />, () => {
             if (error || !source) setAttempt(value => value + 1);
             else browser.current?.reload();
           })}
-          {control('Close drafts', <X size={22} color={theme.colors.text} />, onClose)}
+          {control(`Close ${title.toLowerCase()}`,  <X size={22} color={theme.colors.text} />, onClose)}
         </View>
         {error ? (
           <View style={styles.error}>
@@ -66,14 +69,23 @@ export function DraftsModal({ api, initialPath, theme, onClose }: {
             source={source}
             style={[styles.screen, { backgroundColor: theme.colors.background }]}
             originWhitelist={["*"]}
-            onShouldStartLoadWithRequest={request => draftNavigationAllowed(api.baseUrl, request.url)}
+            onShouldStartLoadWithRequest={request => {
+              if (page !== 'terminal') return draftNavigationAllowed(api.baseUrl, request.url);
+              try {
+                const url = new URL(request.url);
+                if (request.isTopFrame && url.origin === new URL(api.baseUrl).origin && ['/', '/command-center', '/app'].includes(url.pathname)) {
+                  onClose(); return false;
+                }
+              } catch {}
+              return temporaryTerminalNavigationAllowed(api.baseUrl, request.url);
+            }}
             onNavigationStateChange={state => setCanGoBack(state.canGoBack)}
             onLoadStart={() => setLoading(true)}
             onLoadEnd={() => setLoading(false)}
             onError={event => { setError(event.nativeEvent.description); setLoading(false); }}
             onHttpError={event => {
-              if (['/auth/browser-handoff', '/drafts'].includes(new URL(event.nativeEvent.url).pathname)) {
-                setError(`Could not load Drafts (${event.nativeEvent.statusCode}). Try again.`);
+              if (['/auth/browser-handoff', '/drafts', '/temporary-terminals'].includes(new URL(event.nativeEvent.url).pathname)) {
+                setError(`Could not load ${title} (${event.nativeEvent.statusCode}). Try again.`);
                 setLoading(false);
               }
             }}
