@@ -15,7 +15,7 @@ export function TerminalShareModal({ api, target, theme, onClose }: {
   const insets = useSafeAreaInsets();
   const [share, setShare] = React.useState<TerminalShareState>({});
   const [ttl, setTtl] = React.useState<number>(86400);
-  const [allowControl, setAllowControl] = React.useState(false);
+  const [allowControl, setAllowControl] = React.useState(true);
   const [busy, setBusy] = React.useState(true);
   const [ready, setReady] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -28,6 +28,7 @@ export function TerminalShareModal({ api, target, theme, onClose }: {
     terminalShareUrl(value); // Validate before making any URL actionable.
     setShare(value); setReady(true);
     if (value.viewerUrl) { setTtl(value.ttlSeconds || 86400); setAllowControl(Boolean(value.allowControl)); }
+    else { setTtl(current => SHARE_DURATIONS.some(item => item.seconds === current) ? current : 86400); setAllowControl(true); }
   }, []);
   React.useEffect(() => {
     mounted.current = true;
@@ -45,7 +46,7 @@ export function TerminalShareModal({ api, target, theme, onClose }: {
     const current = generation.current;
     pending.current = true; setBusy(true); setError(''); setNotice('');
     try {
-      const value = await api.terminalShare(target, action, ttl, allowControl);
+      const value = await api.terminalShare(target, action, action === 'start' ? ttl : 86400, allowControl);
       if (mounted.current && current === generation.current) apply(value);
     } catch (reason) {
       if (mounted.current && current === generation.current) setError(reason instanceof Error ? reason.message : String(reason));

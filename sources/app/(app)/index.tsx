@@ -1,3 +1,5 @@
+import { useAppDialog } from "@/tmux-mobile/app-dialog";
+import { temporaryTerminalsPath } from "@/tmux-mobile/temporary-terminal-navigation";
 import { TerminalShareModal } from "@/tmux-mobile/terminal-share-modal";
 import { canShareTerminal } from "@/tmux-mobile/terminal-share";
 import { sessionDraftsPath } from "@/tmux-mobile/drafts-navigation";
@@ -7,7 +9,6 @@ import { conversationPath } from "@/tmux-mobile/conversation-link";
 import * as React from "react";
 import {
   ActivityIndicator,
-  Alert,
   AppState,
   Animated,
   FlatList,
@@ -64,6 +65,7 @@ import {
 import { darkTheme, lightTheme } from "@/theme";
 import type { AppTheme } from "@/theme";
 import {
+  SquareTerminal,
   Check,
   AlertCircle,
   BookOpen,
@@ -858,6 +860,8 @@ function CommandCenterScreen() {
   const [cardSearchVisible, setCardSearchVisible] = React.useState(false);
   const [pinsVisible, setPinsVisible] = React.useState(false);
   const [shareTarget, setShareTarget] = React.useState<AgentSession | null>(null);
+  const pendingTemporaryPath = React.useRef<string | null>(null);
+  const [temporaryPath, setTemporaryPath] = React.useState<string | null>(null);
   const [draftsPath, setDraftsPath] = React.useState<string | null>(null);
   const [settingsVisible, setSettingsVisible] = React.useState(false);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentSession | null>(null);
@@ -873,6 +877,7 @@ function CommandCenterScreen() {
   const [pinningResponseKey, setPinningResponseKey] = React.useState("");
   const effectiveThemeMode = themeMode === "auto" ? systemColorScheme : themeMode;
   const theme = effectiveThemeMode === "dark" ? darkTheme : lightTheme;
+  const appDialog = useAppDialog(theme);
   const fontScale = FONT_SCALE_VALUES[fontScaleLevel];
   const layout = React.useMemo(
     () => createResponsiveLayout(windowWidth, windowHeight, fontScale),
@@ -1147,7 +1152,7 @@ function CommandCenterScreen() {
   const confirmDeleteAgent = React.useCallback(
     (agent: AgentSession) => {
       const title = agentTitle(agent);
-      Alert.alert("Delete session", `Kill "${title}" on ${agent.machineHostname || agentMachineKey(agent)}?`, [
+      appDialog.show("Delete session", `Kill "${title}" on ${agent.machineHostname || agentMachineKey(agent)}?`, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
@@ -1218,7 +1223,7 @@ function CommandCenterScreen() {
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: (error) => {
-            Alert.alert("Pin failed", error instanceof Error ? error.message : String(error));
+            appDialog.show("Pin failed", error instanceof Error ? error.message : String(error));
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           },
           onSettled: () => {
@@ -1270,6 +1275,7 @@ function CommandCenterScreen() {
   );
 
   const modalOpen = Boolean(
+    appDialog.visible ||
     sendTarget ||
       renameTarget ||
       viewTarget ||
@@ -1282,6 +1288,7 @@ function CommandCenterScreen() {
       cardSearchVisible ||
       pinsVisible ||
       shareTarget ||
+      temporaryPath ||
       draftsPath ||
       settingsVisible,
   );
@@ -1359,7 +1366,7 @@ function CommandCenterScreen() {
         shortcutActiveRead.current = null;
         setActiveReadAgentKey("");
         if (error instanceof Error && error.name === "AbortError") return;
-        Alert.alert(
+        appDialog.show(
           "Read aloud failed",
           error instanceof Error ? error.message : String(error),
         );
@@ -1385,7 +1392,7 @@ function CommandCenterScreen() {
         shortcutReadAbort.current = null;
         shortcutActiveRead.current = null;
         setActiveReadAgentKey("");
-        Alert.alert("Read aloud failed", shortcutAudioStatus.error);
+        appDialog.show("Read aloud failed", shortcutAudioStatus.error);
       }
       return;
     }
@@ -1400,7 +1407,7 @@ function CommandCenterScreen() {
       shortcutReadAbort.current = null;
       shortcutActiveRead.current = null;
       setActiveReadAgentKey("");
-      Alert.alert("Read aloud failed", shortcutAudioStatus.error);
+      appDialog.show("Read aloud failed", shortcutAudioStatus.error);
     }
   }, [
     shortcutAudioStatus.didJustFinish,
@@ -1447,6 +1454,7 @@ function CommandCenterScreen() {
       if (!shortcut) return;
 
       if (shortcut.type === "escape") {
+        if (appDialog.visible) { appDialog.dismiss(); e.preventDefault?.(); return; }
         // A hardware Escape key belongs to the embedded terminal while it is
         // active. The terminal sheet has an explicit close button.
         if (sshTarget) return;
@@ -1461,6 +1469,7 @@ function CommandCenterScreen() {
         else if (menuVisible) setMenuVisible(false);
         else if (cardSearchVisible) setCardSearchVisible(false);
         else if (pinsVisible) setPinsVisible(false);
+        else if (temporaryPath) setTemporaryPath(null);
         else if (draftsPath) setDraftsPath(null);
         else if (settingsVisible) setSettingsVisible(false);
         else return;
@@ -1531,6 +1540,7 @@ function CommandCenterScreen() {
       pinsVisible,
       shareTarget,
       draftsPath,
+      temporaryPath,
       readShortcutAgent,
       renameTarget,
       refreshCommandCenter,
@@ -1844,13 +1854,13 @@ function CommandCenterScreen() {
                         onConversation={() => {
                           const path = conversationPath(item);
                           if (api && path) openAuthenticatedControllerUrl(api, api.url(path).toString())
-                            .catch(error => Alert.alert("Could not open conversation", error.message));
+                            .catch(error => appDialog.show("Could not open conversation", error.message));
                         }}
                         onCopyConversation={() => {
                           const path = conversationPath(item);
                           if (api && path) Clipboard.setStringAsync(api.url(path).toString())
-                            .then(() => Alert.alert("Link copied", "Only people with session access can open this conversation."))
-                            .catch(error => Alert.alert("Could not copy link", error.message));
+                            .then(() => appDialog.show("Link copied", "Only people with session access can open this conversation."))
+                            .catch(error => appDialog.show("Could not copy link", error.message));
                         }}
                         onTranscript={() => {
                           selectAgent();
@@ -1949,6 +1959,8 @@ function CommandCenterScreen() {
         onClose={() => setCardSearchVisible(false)}
       />
       {shareTarget && api ? <TerminalShareModal key={agentCardKey(shareTarget)} api={api} target={shareTarget} theme={theme} onClose={() => setShareTarget(null)} /> : null}
+      {appDialog.node}
+      {temporaryPath && api ? <DraftsModal api={api} initialPath={temporaryPath} page="terminal" theme={theme} onClose={() => setTemporaryPath(null)} /> : null}
       {draftsPath && api ? <DraftsModal api={api} initialPath={draftsPath} theme={theme} onClose={() => setDraftsPath(null)} /> : null}
       <PinnedArtifactsModal visible={pinsVisible} onClose={() => setPinsVisible(false)} />
       <SettingsModal
@@ -1967,6 +1979,17 @@ function CommandCenterScreen() {
         onCardSortChange={updateCardSort}
         topOffset={insets.top + 54}
         onClose={() => setMenuVisible(false)}
+        onTemporaryTerminal={() => {
+          const path = temporaryTerminalsPath(machineFilter);
+          if (Platform.OS === "ios") pendingTemporaryPath.current = path;
+          else setTemporaryPath(path);
+          setMenuVisible(false);
+        }}
+        onDismiss={() => {
+          const path = pendingTemporaryPath.current;
+          pendingTemporaryPath.current = null;
+          if (path) setTemporaryPath(path);
+        }}
         onStartAgent={openStartAgent}
         onPinnedArtifacts={openPinnedArtifacts}
         onRefresh={refreshCommandCenter}
@@ -3065,7 +3088,9 @@ function CommandMenu({
   visible,
   topOffset,
   onClose,
+  onDismiss,
   onStartAgent,
+  onTemporaryTerminal,
   onPinnedArtifacts,
   onRefresh,
   onSettings,
@@ -3078,7 +3103,9 @@ function CommandMenu({
   visible: boolean;
   topOffset: number;
   onClose: () => void;
+  onDismiss: () => void;
   onStartAgent: () => void;
+  onTemporaryTerminal: () => void;
   onPinnedArtifacts: () => void;
   onRefresh: () => void;
   onSettings: () => void;
@@ -3091,7 +3118,7 @@ function CommandMenu({
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} onDismiss={onDismiss}>
       <View style={styles.menuLayer}>
         <Pressable accessibilityLabel="Close command menu" style={styles.menuBackdrop} onPress={onClose} />
         <View style={[styles.menuPanel, { marginTop: topOffset, maxHeight: Math.max(140, height - topOffset - insets.bottom - 12) }]} >
@@ -3100,6 +3127,11 @@ function CommandMenu({
             icon={<Play size={18} color={theme.colors.accent} />}
             label="Start agent"
             onPress={onStartAgent}
+          />
+          <MenuAction
+            icon={<SquareTerminal size={18} color={theme.colors.text} />}
+            label="Temporary terminal"
+            onPress={onTemporaryTerminal}
           />
           <MenuAction
             icon={<RefreshCcw size={18} color={theme.colors.text} />}
@@ -5176,6 +5208,7 @@ function EmbeddedSshModal({
   onClose: () => void;
 }) {
   const theme = useAppTheme();
+  const appDialog = useAppDialog(theme, Boolean(target));
   const styles = useAppStyles();
   const fontScale = useFontScale();
   const visionControls = useVisionControls();
@@ -5429,7 +5462,7 @@ function EmbeddedSshModal({
 
   const forgetProfile = React.useCallback(() => {
     if (!profileKey) return;
-    Alert.alert(
+    appDialog.show(
       "Forget SSH profile?",
       "This removes the saved host, username, and credential from this device.",
       [
@@ -5473,7 +5506,7 @@ function EmbeddedSshModal({
       const body = changed
         ? `The identity of ${profile?.host || "this host"} no longer matches the previous key. This can indicate a man-in-the-middle attack or a rebuilt machine.\n\nFingerprint\n${fingerprint}`
         : `Verify this fingerprint for ${profile?.host || "this host"} before connecting.\n\n${fingerprint}`;
-      Alert.alert(title, body, [
+      appDialog.show(title, body, [
         {
           text: "Cancel",
           style: "cancel",
@@ -5851,6 +5884,7 @@ function EmbeddedSshModal({
       fullscreenOnWide
       captureShortcuts={false}
     >
+      {appDialog.node}
       {profileLoading || editing || !profile ? setup : terminal}
     </SheetModal>
   );
@@ -7333,6 +7367,7 @@ function TranscriptModal({
 function PinnedArtifactsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const api = useTmuxMobileApi();
   const theme = useAppTheme();
+  const appDialog = useAppDialog(theme, visible);
   const styles = useAppStyles();
   const visionControls = useVisionControls();
   const fieldPresentation = useFieldPresentation("artifact-name");
@@ -7439,7 +7474,7 @@ function PinnedArtifactsModal({ visible, onClose }: { visible: boolean; onClose:
   const confirmDeletePin = React.useCallback(
     (pin: ArtifactPin) => {
       if (!pin.owned) return;
-      Alert.alert("Unpin artifact", `Remove "${pin.name || "this artifact"}" and its shared link?`, [
+      appDialog.show("Unpin artifact", `Remove "${pin.name || "this artifact"}" and its shared link?`, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Unpin",
@@ -7461,6 +7496,7 @@ function PinnedArtifactsModal({ visible, onClose }: { visible: boolean; onClose:
 
   return (
     <SheetModal visible={visible} title="Pinned artifacts" onClose={onClose} tall wide>
+      {appDialog.node}
       <View style={styles.responseSheetMetaRow}>
         <Text style={styles.sheetMeta} numberOfLines={1}>
           {pins.isLoading ? "Loading..." : `${data.length} pin${data.length === 1 ? "" : "s"}`}
