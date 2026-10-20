@@ -22,7 +22,7 @@ export function shouldFoldSessionCards(platform: CardFoldingPlatform): boolean {
 }
 
 /**
- * Recent cards use the full presentation because the same eight-hour activity
+ * Recent cards use the full presentation because the same fourteen-hour activity
  * signal also gives them their emphasized timestamp. Only muted/stale iPhone
  * cards participate in the compact accordion.
  */

@@ -8,7 +8,7 @@ import {
 const NOW = Date.parse("2026-07-26T12:00:00.000Z");
 
 describe("isRecentActivity", () => {
-  it("highlights activity through the eight-hour boundary", () => {
+  it("highlights activity through the fourteen-hour boundary", () => {
     expect(isRecentActivity(new Date(NOW - RECENT_ACTIVITY_WINDOW_MS + 1).toISOString(), NOW)).toBe(true);
     expect(isRecentActivity(new Date(NOW - RECENT_ACTIVITY_WINDOW_MS).toISOString(), NOW)).toBe(true);
     expect(isRecentActivity(new Date(NOW - RECENT_ACTIVITY_WINDOW_MS - 1).toISOString(), NOW)).toBe(false);
@@ -20,9 +20,9 @@ describe("isRecentActivity", () => {
     expect(isRecentActivity(new Date(NOW + 1).toISOString(), NOW)).toBe(false);
   });
 
-  it("treats activity older than eight hours as stale", () => {
-    expect(isRecentActivity(new Date(NOW - 8 * 60 * 60 * 1_000).toISOString(), NOW)).toBe(true);
-    expect(isRecentActivity(new Date(NOW - 8 * 60 * 60 * 1_000 - 1).toISOString(), NOW)).toBe(false);
+  it("treats activity older than fourteen hours as stale", () => {
+    expect(isRecentActivity(new Date(NOW - 14 * 60 * 60 * 1_000).toISOString(), NOW)).toBe(true);
+    expect(isRecentActivity(new Date(NOW - 14 * 60 * 60 * 1_000 - 1).toISOString(), NOW)).toBe(false);
   });
 });
 

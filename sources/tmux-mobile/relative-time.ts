@@ -1,4 +1,4 @@
-export const RECENT_ACTIVITY_WINDOW_MS = 8 * 60 * 60 * 1_000;
+export const RECENT_ACTIVITY_WINDOW_MS = 14 * 60 * 60 * 1_000;
 
 function timestampMs(value: string | null | undefined): number {
   const ms = Date.parse(value || "");
