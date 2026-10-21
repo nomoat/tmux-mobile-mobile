@@ -1,3 +1,4 @@
+import { SelectableTextPage, TextSelectionModal, type TextSelectionTarget } from "@/tmux-mobile/text-selection";
 import { useAppDialog } from "@/tmux-mobile/app-dialog";
 import { temporaryTerminalsPath } from "@/tmux-mobile/temporary-terminal-navigation";
 import { TerminalShareModal } from "@/tmux-mobile/terminal-share-modal";
@@ -65,6 +66,7 @@ import {
 import { darkTheme, lightTheme } from "@/theme";
 import type { AppTheme } from "@/theme";
 import {
+  TextSelect,
   SquareTerminal,
   Check,
   AlertCircle,
@@ -825,6 +827,7 @@ function CommandCenterScreen() {
   const [renameTarget, setRenameTarget] = React.useState<AgentSession | null>(null);
   const [viewTarget, setViewTarget] = React.useState<AgentSession | null>(null);
   const [sshTarget, setSshTarget] = React.useState<AgentSession | null>(null);
+  const [textSelection, setTextSelection] = React.useState<TextSelectionTarget | null>(null);
   const [responseTarget, setResponseTarget] = React.useState<AgentSession | null>(null);
   const [fileTarget, setFileTarget] = React.useState<AgentFileTarget | null>(null);
   const [transcriptTarget, setTranscriptTarget] = React.useState<AgentSession | null>(null);
@@ -1276,7 +1279,7 @@ function CommandCenterScreen() {
   );
 
   const modalOpen = Boolean(
-    appDialog.visible ||
+    textSelection || appDialog.visible ||
     sendTarget ||
       renameTarget ||
       viewTarget ||
@@ -1459,7 +1462,8 @@ function CommandCenterScreen() {
         // A hardware Escape key belongs to the embedded terminal while it is
         // active. The terminal sheet has an explicit close button.
         if (sshTarget) return;
-        if (shareTarget) setShareTarget(null);
+        if (textSelection) setTextSelection(null);
+        else if (shareTarget) setShareTarget(null);
         else if (fileTarget) setFileTarget(null);
         else if (transcriptTarget) setTranscriptTarget(null);
         else if (responseTarget) setResponseTarget(null);
@@ -1546,6 +1550,7 @@ function CommandCenterScreen() {
       renameTarget,
       refreshCommandCenter,
       responseTarget,
+      textSelection,
       sendTarget,
       settingsVisible,
       sshTarget,
@@ -1822,6 +1827,7 @@ function CommandCenterScreen() {
                           selectAgent();
                           setViewTarget(item);
                         }}
+                        onSelectText={setTextSelection}
                         onViewResponse={() => {
                           selectAgent();
                           setResponseTarget(item);
@@ -1893,6 +1899,7 @@ function CommandCenterScreen() {
         <Plus size={22} color={theme.dark ? theme.colors.background : theme.colors.surface} strokeWidth={2.4} />
       </Pressable>
 
+      <TextSelectionModal target={textSelection} theme={theme} onClose={() => setTextSelection(null)} />
       <SendModal target={sendTarget} onClose={() => setSendTarget(null)} />
       <RenameModal target={renameTarget} onClose={() => setRenameTarget(null)} />
       <WindowViewModal
@@ -2525,6 +2532,7 @@ function AgentCard({
   onDelete,
   onView,
   onViewResponse,
+  onSelectText,
   onCopyPrompt,
   onCopyResponse,
   onPinResponse,
@@ -2553,6 +2561,7 @@ function AgentCard({
   onDelete: () => void;
   onView: () => void;
   onViewResponse: () => void;
+  onSelectText: (target: TextSelectionTarget) => void;
   onCopyPrompt: () => void;
   onCopyResponse: () => void;
   onPinResponse: () => void;
@@ -2573,7 +2582,7 @@ function AgentCard({
   const fontScale = useFontScale();
   const queryClient = useQueryClient();
   const markdownStyle = React.useMemo(() => createMarkdownStyles(theme, fontScale), [theme, fontScale]);
-  const markdownRules = React.useMemo(() => createMarkdownPathRules(onOpenFile, { agent, selectable: true }), [onOpenFile, agent]);
+  const markdownRules = React.useMemo(() => createMarkdownPathRules(onOpenFile, { agent, selectable: false }), [onOpenFile, agent]);
   const status = agent.waitingForInput ? "waiting" : agent.status || agent.turn || "unverified";
   const running = status === "running";
   const summary = sessionCardSummary(agent);
@@ -2694,7 +2703,8 @@ function AgentCard({
                 label="Last prompt"
                 timestamp={agent.lastUserAt}
                 nowMs={nowMs}
-                actions={
+                actions={<>
+                  <SectionActionButton icon={<TextSelect size={13} color={theme.colors.textMuted} />} label="Select prompt text" onPress={() => onSelectText({ title: "Last prompt", text: agent.lastUserText || "" })} />
                   <SectionActionButton
                     icon={
                       promptCopied ? (
@@ -2707,9 +2717,9 @@ function AgentCard({
                     disabled={Boolean(agent.fullTextError)}
                     onPress={onCopyPrompt}
                   />
-                }
+                </>}
               />
-              <Text style={styles.promptText} numberOfLines={2}>
+              <Text style={styles.promptText} numberOfLines={2} onLongPress={() => onSelectText({ title: "Last prompt", text: agent.lastUserText || "" })}>
                 {agent.lastUserText}
               </Text>
             </View>
@@ -2722,6 +2732,7 @@ function AgentCard({
                 nowMs={nowMs}
                 actions={
                   <>
+                    <SectionActionButton icon={<TextSelect size={13} color={theme.colors.textMuted} />} label="Select response text" onPress={() => onSelectText({ title: "Last response", text: agent.lastAssistantText || "" })} />
                     <SectionActionButton
                       icon={<Maximize size={13} color={theme.colors.textMuted} />}
                       label="Open response"
@@ -2755,9 +2766,11 @@ function AgentCard({
                   </>
                 }
               />
-              <Markdown style={markdownStyle} rules={markdownRules}>
-                {agent.lastAssistantText}
-              </Markdown>
+              <Pressable onLongPress={() => onSelectText({ title: "Last response", text: agent.lastAssistantText || "" })} delayLongPress={500} accessibilityHint="Long-press to select text in a separate page">
+                <Markdown style={markdownStyle} rules={markdownRules}>
+                  {agent.lastAssistantText}
+                </Markdown>
+              </Pressable>
             </View>
           ) : null}
           <View style={styles.cardActions}>
@@ -6839,6 +6852,7 @@ function ResponseModal({
   const styles = useAppStyles();
   const fontScale = useFontScale();
   const pinArtifact = usePinInlineArtifact();
+  const [selectionText, setSelectionText] = React.useState<string | null>(null);
   const [pinStatus, setPinStatus] = React.useState("");
   const text = target?.lastAssistantText || "";
   const markdownStyle = React.useMemo(
@@ -6875,6 +6889,7 @@ function ResponseModal({
   );
   React.useEffect(() => {
     setPinStatus("");
+    setSelectionText(null);
   }, [target]);
 
   const pinResponse = React.useCallback(() => {
@@ -6923,6 +6938,7 @@ function ResponseModal({
           {target ? agentTitle(target) : ""}
         </Text>
         <View style={styles.responseHeaderActions}>
+          <ActionButton icon={<TextSelect size={15} color={theme.colors.text} />} label={selectionText === null ? "Select text" : "Show formatted response"} onPress={() => setSelectionText(selectionText === null ? text : null)} />
           <ActionButton
             icon={<Send size={15} color={theme.colors.accent} />}
             label="Reply to session"
@@ -6959,7 +6975,7 @@ function ResponseModal({
         </View>
       </View>
       {pinStatus ? <Text style={styles.sheetMeta} numberOfLines={1}>{pinStatus}</Text> : null}
-      <ScrollView style={styles.responseFullBox}>
+      {selectionText !== null ? <SelectableTextPage text={selectionText} theme={theme} /> : <ScrollView style={styles.responseFullBox}>
         <Markdown
           style={markdownStyle}
           rules={markdownRules}
@@ -6967,7 +6983,7 @@ function ResponseModal({
         >
           {text || "No response."}
         </Markdown>
-      </ScrollView>
+      </ScrollView>}
     </SheetModal>
   );
 }
