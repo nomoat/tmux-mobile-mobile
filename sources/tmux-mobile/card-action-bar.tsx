@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 import type { AppTheme } from '@/theme';
-import { CARD_ACTION_COLUMNS, CARD_ACTION_ICONS, type CardIconId } from './card-actions';
+import { CARD_ACTION_LAYOUT, CARD_ACTION_ICONS, type CardIconId } from './card-actions';
 import { cardActionItems, type CardActionHandlers } from './card-action-state';
 import type { AgentSession } from './types';
 
@@ -22,14 +22,13 @@ export function CardActionBar({ agent, reading, handlers, theme }: {
 }) {
   const [hint, setHint] = React.useState<string | null>(null);
   const items = cardActionItems(agent, reading, handlers);
-  const rows = Array.from({ length: Math.ceil(items.length / CARD_ACTION_COLUMNS) }, (_, index) =>
-    items.slice(index * CARD_ACTION_COLUMNS, (index + 1) * CARD_ACTION_COLUMNS));
   return <View style={styles.bar} testID="card-actions">
     {hint ? <View pointerEvents="none" style={[styles.hint, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       <Text style={{ color: theme.colors.text, fontSize: 12 }}>{hint}</Text>
     </View> : null}
-    {rows.map((row, index) => <View key={index} style={styles.row}>
-      {row.map(action => <Pressable
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}
+      contentContainerStyle={styles.row} onScrollBeginDrag={() => setHint(null)}>
+      {items.map(action => <Pressable
         key={action.id}
         testID={`card-action-${action.id}`}
         accessibilityRole="button"
@@ -48,13 +47,14 @@ export function CardActionBar({ agent, reading, handlers, theme }: {
       >
         <CardActionIcon id={action.icon} color={action.active ? theme.colors.accent : theme.colors.textMuted} />
       </Pressable>)}
-    </View>)}
+    </ScrollView>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  bar: { width: '100%', maxWidth: 300, alignSelf: 'flex-end', gap: 4 },
-  row: { flexDirection: 'row', gap: 6 },
-  button: { flex: 1, minWidth: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  bar: { width: '100%' },
+  scroll: { height: CARD_ACTION_LAYOUT.height, flexGrow: 0 },
+  row: { flexDirection: 'row', flexGrow: 1, gap: CARD_ACTION_LAYOUT.gap },
+  button: { width: CARD_ACTION_LAYOUT.minWidth, flexGrow: 1, flexShrink: 0, height: CARD_ACTION_LAYOUT.height, alignItems: 'center', justifyContent: 'center' },
   hint: { position: 'absolute', bottom: '100%', left: 0, right: 0, padding: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, zIndex: 1 },
 });
