@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { CARD_ACTIONS, CARD_ACTION_COLUMNS } from './card-actions';
+import { CARD_ACTIONS, CARD_ACTION_LAYOUT } from './card-actions';
 import { cardActionItems, type CardActionHandlers } from './card-action-state';
 import type { AgentSession } from './types';
 
@@ -10,9 +10,9 @@ const agent = { machineId: 'machine', kind: 'codex', agentSessionId: 'session', 
 const handlers = () => Object.fromEntries(CARD_ACTIONS.map(action => [action.id, vi.fn()])) as unknown as CardActionHandlers;
 
 describe('shared card actions', () => {
-  it('retains the same two rows when session identity or terminal sharing is unavailable', () => {
+  it('retains the same compact action order when session identity or terminal sharing is unavailable', () => {
     const items = cardActionItems({ ...agent, agentSessionId: undefined, paneId: undefined, mux: 'rmux' }, false, handlers());
-    expect(CARD_ACTION_COLUMNS).toBe(5);
+    expect(CARD_ACTION_LAYOUT.height).toBe(32);
     expect(items.map(action => action.id)).toEqual(order);
     expect(items.filter(action => action.disabled).map(action => action.id)).toEqual(['conversation', 'drafts', 'transcript', 'share', 'copyLink']);
   });
