@@ -73,6 +73,8 @@ the Web repository's `public/card-actions.js`; do not edit the copy by hand.
 Run `node scripts/sync-card-actions.mjs --source ../tmux-mobile/public/card-actions.js`
 to update it, then typecheck and test. Publish Web before production OTA;
 `scripts/ota-update.sh` checks the hosted contract before publishing. A direct
-EAS update must first pass `node scripts/sync-card-actions.mjs --check --source
-https://eng.xyznot.com/card-actions.js` too. Ship both runtime 7 platforms and the
+EAS update must first pass `node scripts/sync-card-actions.mjs --check --deployed
+https://eng.xyznot.com` too. This reads the public health revision and uses `gh`
+to compare its exact committed source, without copying browser credentials.
+Ship both runtime 7 platforms and the
 existing runtime 6 Android backport from its own unchanged dependencies.
