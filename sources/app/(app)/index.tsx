@@ -1,3 +1,4 @@
+import { CardActionBar, CardActionIcon } from "@/tmux-mobile/card-action-bar";
 import { SelectableTextPage, TextSelectionModal, type TextSelectionTarget } from "@/tmux-mobile/text-selection";
 import { useAppDialog } from "@/tmux-mobile/app-dialog";
 import { temporaryTerminalsPath } from "@/tmux-mobile/temporary-terminal-navigation";
@@ -78,7 +79,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  Globe,
   CloudDownload,
   Copy,
   Edit3,
@@ -92,7 +92,6 @@ import {
   Info,
   KeyRound,
   Link2,
-  List,
   ListPlus,
   Laptop,
   LogOut,
@@ -105,7 +104,6 @@ import {
   MoreVertical,
   Pin,
   Play,
-  PencilLine,
   Plus,
   RefreshCcw,
   Send,
@@ -2773,70 +2771,23 @@ function AgentCard({
               </Pressable>
             </View>
           ) : null}
-          <View style={styles.cardActions}>
-            <ActionButton
-              icon={<Send size={16} color={theme.colors.textMuted} />}
-              label="Interact"
-              onPress={onSend}
-            />
-            <ActionButton
-              icon={<List size={16} color={theme.colors.textMuted} />}
-              label="Transcript"
-              onPress={onTranscript}
-            />
-            {conversationPath(agent) ? <>
-              <ActionButton
-                icon={<BookOpen size={16} color={theme.colors.textMuted} />}
-                label="Conversation"
-                onPress={onConversation}
-              />
-              <ActionButton
-                icon={<Link2 size={16} color={theme.colors.textMuted} />}
-                label="Copy conversation link"
-                onPress={onCopyConversation}
-              />
-            </> : null}
-            {sessionDraftsPath(agent) ? (
-              <ActionButton
-                icon={<FileText size={16} color={theme.colors.textMuted} />}
-                label="Drafts"
-                onPress={onDrafts}
-              />
-            ) : null}
-            <ActionButton
-              icon={<PencilLine size={16} color={theme.colors.textMuted} />}
-              label="Rename window"
-              onPress={onRename}
-            />
-            <ActionButton
-              icon={
-                reading ? (
-                  <Square size={14} color={theme.colors.textMuted} fill={theme.colors.textMuted} />
-                ) : (
-                  <Volume2 size={16} color={theme.colors.textMuted} />
-                )
-              }
-              label={reading ? "Stop reading" : "Read aloud"}
-              disabled={Boolean(agent.fullTextError)}
-              onPress={onReadAloud}
-              active={reading}
-            />
-            <ActionButton
-              icon={<ExternalLink size={16} color={theme.colors.textMuted} />}
-              label="Open terminal"
-              onPress={onView}
-            />
-            {canShareTerminal(agent) ? <ActionButton
-              icon={<Globe size={16} color={theme.colors.textMuted} />}
-              label="Share terminal"
-              onPress={onShareTerminal}
-            /> : null}
-            <ActionButton
-              icon={<Trash2 size={16} color={theme.colors.textMuted} />}
-              label="Complete and delete window"
-              onPress={onDelete}
-            />
-          </View>
+          <CardActionBar
+            agent={agent}
+            reading={reading}
+            theme={theme}
+            handlers={{
+              interact: onSend,
+              conversation: onConversation,
+              drafts: onDrafts,
+              transcript: onTranscript,
+              read: onReadAloud,
+              terminal: onView,
+              share: onShareTerminal,
+              copyLink: onCopyConversation,
+              rename: onRename,
+              delete: onDelete,
+            }}
+          />
         </View>
       ) : null}
     </View>
@@ -6637,7 +6588,7 @@ function WindowViewModal({
         </View>
         <View style={styles.sessionScreenActions}>
           {target && canShareTerminal(target) ? <ActionButton
-            icon={<Globe size={16} color={theme.colors.textMuted} />}
+            icon={<CardActionIcon id="share" color={theme.colors.textMuted} />}
             label="Share terminal"
             onPress={() => { Keyboard.dismiss(); setTerminalShareTarget(target); }}
           /> : null}
@@ -9291,12 +9242,6 @@ function createStyles(
 	    color: theme.colors.accent,
 	    textDecorationLine: "underline",
 	  },
-  cardActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: 6,
-  },
   sectionActionButton: {
     width: 24,
     height: 24,

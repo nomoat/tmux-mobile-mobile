@@ -20,6 +20,10 @@ export EAS_UPDATE_CHANNEL="$CHANNEL"
 export BUILD_TIME="${BUILD_TIME:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
 export JS_UPDATE_VERSION="${JS_UPDATE_VERSION:-$(date -u '+%Y%m%d.%H%M%S')}"
 
+if [[ "$CHANNEL" == "production" ]]; then
+  node scripts/sync-card-actions.mjs --check --source https://eng.xyznot.com/card-actions.js
+fi
+
 echo "Publishing AMUX OTA"
 echo "  channel: $CHANNEL"
 echo "  app env: $APP_ENV"
