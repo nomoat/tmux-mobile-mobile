@@ -38,7 +38,7 @@ TMUX_MOBILE_CONTROLLER_URL=https://example.com yarn dev
 
 ## Terminal share links (2026-10-19)
 
-The globe action on tmux cards and in Terminal opens the same sharing controls
+The share action on tmux cards and in Terminal opens the same sharing controls
 on iOS and Android: 10 minutes, 24 hours, 5 days or 7 days; 24 hours and viewer control by default; copy, system share, open and stop. The link uses our
 Cloudflare viewer at share.xyznot.com. The authenticated Controller creates it
 for the captured machine/pane; no terminal relay runs in the mobile app.
@@ -60,3 +60,19 @@ and cancel actions, including SSH trust decisions.
 
 Publish runtime 7 iOS/Android OTA and the runtime 6 Android backport from its own
 checkout/lockfile. This change adds no native module and requires no binary build.
+
+## Shared card actions (2026-10-22)
+
+Web, iOS and Android use two fixed rows of five icons, with 44px touch targets:
+Send message, Conversation, Drafts, Transcript, Read aloud; then Open terminal,
+Share terminal, Copy conversation link, Rename window, Complete and delete window.
+Unavailable actions keep their disabled slots. Long-press an icon for its name
+and explanation. `sources/tmux-mobile/card-actions.js` is an exact bundled copy of
+the Web repository's `public/card-actions.js`; do not edit the copy by hand.
+
+Run `node scripts/sync-card-actions.mjs --source ../tmux-mobile/public/card-actions.js`
+to update it, then typecheck and test. Publish Web before production OTA;
+`scripts/ota-update.sh` checks the hosted contract before publishing. A direct
+EAS update must first pass `node scripts/sync-card-actions.mjs --check --source
+https://eng.xyznot.com/card-actions.js` too. Ship both runtime 7 platforms and the
+existing runtime 6 Android backport from its own unchanged dependencies.

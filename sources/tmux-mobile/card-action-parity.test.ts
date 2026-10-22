@@ -20,27 +20,14 @@ function expectInOrder(source: string, values: string[]) {
 }
 
 describe("Command Center card action parity", () => {
-  it("keeps the shared iOS and Android footer actions in order", () => {
-    expectInOrder(cardSource, [
-      'label="Interact"',
-      'label="Transcript"',
-      'label="Conversation"',
-      'label="Copy conversation link"',
-      'label="Drafts"',
-      'label="Rename window"',
-      'label={reading ? "Stop reading" : "Read aloud"}',
-      'label="Open terminal"',
-      'label="Share terminal"',
-      'label="Complete and delete window"',
-    ]);
-    expect(cardSource).toContain("<Send");
-    expect(cardSource).toContain("<BookOpen");
-    expect(cardSource).toContain("<Link2");
-    expect(cardSource).toContain("<List");
-    expect(cardSource).toContain("<PencilLine");
-    expect(cardSource).toContain("<Volume2");
-    expect(cardSource).toContain("<ExternalLink");
-    expect(cardSource).toContain("<Trash2");
+  it("binds every shared footer action to the matching operation", () => {
+    expect(cardSource).toContain("<CardActionBar");
+    for (const binding of [
+      "interact: onSend", "conversation: onConversation", "drafts: onDrafts",
+      "transcript: onTranscript", "read: onReadAloud", "terminal: onView",
+      "share: onShareTerminal", "copyLink: onCopyConversation",
+      "rename: onRename", "delete: onDelete",
+    ]) expect(cardSource).toContain(binding);
   });
 
   it("keeps content actions beside their matching prompt or response heading", () => {
