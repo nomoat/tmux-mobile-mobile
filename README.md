@@ -79,3 +79,14 @@ https://eng.xyznot.com` too. This reads the public health revision and uses `gh`
 to compare its exact committed source, without copying browser credentials.
 Ship both runtime 7 platforms and the
 existing runtime 6 Android backport from its own unchanged dependencies.
+
+## Selecting native text (2026-10-23)
+
+Long-press native Terminal output, a Transcript message or a full response to
+open a stable selection page inside the same sheet. The Select text button is
+also available; Transcript's button includes every loaded turn. Long-press a
+word there and drag the native selection handles, or use Copy all. Done returns
+to the original reading position. Terminal polling pauses during selection;
+copying removes ANSI controls and keeps all captured lines. Light and dark
+selection colors remain readable. Ship this JavaScript-only change to runtime 7
+iOS/Android and runtime 6 Android from its own checkout and dependencies.
