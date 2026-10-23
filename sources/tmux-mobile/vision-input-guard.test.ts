@@ -157,7 +157,7 @@ describe("Terminal fullscreen behavior", () => {
   });
 
   it("keeps follow behavior and lifts fullscreen sheets above the keyboard", () => {
-    expect(appSource).toContain("const terminalShouldFollow = terminalFollow;");
+    expect(appSource).toContain("const terminalShouldFollow = terminalFollow && !selection;");
     expect(appSource).toContain(
       "const keyboardAffectsSheet = fullscreenActive || !sheetIsWide || !tall;",
     );

@@ -1,5 +1,5 @@
 import { CardActionBar, CardActionIcon } from "@/tmux-mobile/card-action-bar";
-import { SelectableTextPage, TextSelectionModal, type TextSelectionTarget } from "@/tmux-mobile/text-selection";
+import { TextSelectionSurface, TextSelectionModal, type TextSelectionTarget } from "@/tmux-mobile/text-selection";
 import { useAppDialog } from "@/tmux-mobile/app-dialog";
 import { temporaryTerminalsPath } from "@/tmux-mobile/temporary-terminal-navigation";
 import { TerminalShareModal } from "@/tmux-mobile/terminal-share-modal";
@@ -122,6 +122,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { TmuxMobileApi } from "@/tmux-mobile/api";
 import { useTmuxMobileApi, useTmuxMobileAuth } from "@/tmux-mobile/auth";
 import { sshDeviceIdentityManager } from "@/tmux-mobile/ssh-device-identity-storage";
+import { terminalSelectionText, transcriptSelectionText } from "@/tmux-mobile/text-selection-content";
 import { renderAnsiText, stripUnsupportedAnsi } from "@/tmux-mobile/ansi";
 import {
   cardStarsKey,
@@ -5900,6 +5901,7 @@ function WindowViewModal({
   const terminalSuppressChangeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [data, setData] = React.useState<WindowViewResponse | null>(null);
   const [terminalText, setTerminalText] = React.useState("");
+  const [selection, setSelection] = React.useState<TextSelectionTarget | null>(null);
   const [terminalInput, setTerminalInput] = React.useState("");
   const [terminalKeyboardVisible, setTerminalKeyboardVisible] = React.useState(false);
   const [terminalShareTarget, setTerminalShareTarget] = React.useState<AgentSession | null>(null);
@@ -5916,7 +5918,11 @@ function WindowViewModal({
   const [loading, setLoading] = React.useState(false);
   const terminalAutoFocus = windowWidth >= 760;
   const terminalTargetKey = target ? agentCardKey(target) : "";
-  React.useEffect(() => { setTerminalShareTarget(null); }, [terminalTargetKey]);
+  React.useEffect(() => { setTerminalShareTarget(null); setSelection(null); }, [terminalTargetKey]);
+  const selectTerminalText = React.useCallback(() => {
+    Keyboard.dismiss();
+    setSelection({ title: "Terminal output", text: terminalSelectionText(terminalText), monospace: true });
+  }, [terminalText]);
   const previousTerminalTargetKeyRef = React.useRef("");
   const terminalTextScaleRef = React.useRef(1);
   const terminalPinchBaseRef = React.useRef(1);
@@ -6180,7 +6186,7 @@ function WindowViewModal({
   );
 
   React.useEffect(() => {
-    if (!api || !target || !activePaneId) return;
+    if (!api || !target || !activePaneId || selection) return;
     const intervalMs = target.status === "running" || target.waitingForInput
       ? TERMINAL_ACTIVE_REFRESH_MS
       : TERMINAL_IDLE_REFRESH_MS;
@@ -6194,10 +6200,10 @@ function WindowViewModal({
         });
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [activePaneId, api, refreshCapture, target]);
+  }, [activePaneId, api, refreshCapture, target, selection]);
 
   const terminalNodes = React.useMemo(() => renderAnsiText(terminalText), [terminalText]);
-  const terminalShouldFollow = terminalFollow;
+  const terminalShouldFollow = terminalFollow && !selection;
   const updateTerminalFollowFromScroll = React.useCallback((metrics: {
     offsetY: number;
     viewportHeight: number;
@@ -6401,9 +6407,13 @@ function WindowViewModal({
   );
 
   const closeTerminalModal = React.useCallback(() => {
+    if (selection) {
+      setSelection(null);
+      return;
+    }
     Keyboard.dismiss();
     onClose();
-  }, [onClose]);
+  }, [onClose, selection]);
 
   const fileBrowserLocation = fileBrowserLocationLabel(
     fileBrowserData?.root || data?.directories?.cwd || target?.cwd || "",
@@ -6574,6 +6584,7 @@ function WindowViewModal({
       wide
       fullscreen
     >
+      <TextSelectionSurface target={selection} theme={theme} onClose={() => setSelection(null)}>
       {terminalShareTarget && api ? <TerminalShareModal key={agentCardKey(terminalShareTarget)} api={api} target={terminalShareTarget} theme={theme} onClose={() => setTerminalShareTarget(null)} /> : null}
       {fileBrowserVisible ? fileBrowserScreen : (
         <>
@@ -6587,6 +6598,12 @@ function WindowViewModal({
           </Text>
         </View>
         <View style={styles.sessionScreenActions}>
+          <ActionButton
+            icon={<TextSelect size={16} color={theme.colors.textMuted} />}
+            label="Select terminal text"
+            disabled={!terminalText}
+            onPress={selectTerminalText}
+          />
           {target && canShareTerminal(target) ? <ActionButton
             icon={<CardActionIcon id="share" color={theme.colors.textMuted} />}
             label="Share terminal"
@@ -6681,7 +6698,7 @@ function WindowViewModal({
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             keyboardShouldPersistTaps="handled"
           >
-            <Text accessibilityLabel="Terminal output" style={[styles.terminalText, terminalTextZoomStyle]}>
+            <Text accessibilityLabel="Terminal output" accessibilityHint="Long-press to open text selection" onLongPress={selectTerminalText} style={[styles.terminalText, terminalTextZoomStyle]}>
               {terminalText ? terminalNodes : "No output."}
             </Text>
           </ScrollView>
@@ -6777,6 +6794,7 @@ function WindowViewModal({
       </SheetModal>
         </>
       )}
+      </TextSelectionSurface>
     </SheetModal>
   );
 }
@@ -6803,7 +6821,7 @@ function ResponseModal({
   const styles = useAppStyles();
   const fontScale = useFontScale();
   const pinArtifact = usePinInlineArtifact();
-  const [selectionText, setSelectionText] = React.useState<string | null>(null);
+  const [selection, setSelection] = React.useState<TextSelectionTarget | null>(null);
   const [pinStatus, setPinStatus] = React.useState("");
   const text = target?.lastAssistantText || "";
   const markdownStyle = React.useMemo(
@@ -6834,13 +6852,13 @@ function ResponseModal({
     () => createMarkdownPathRules(openAgentFile, {
       agent: target,
       onOpenUrl: handleMarkdownLinkPress,
-      selectable: true,
+      selectable: false,
     }),
     [handleMarkdownLinkPress, openAgentFile, target],
   );
   React.useEffect(() => {
     setPinStatus("");
-    setSelectionText(null);
+    setSelection(null);
   }, [target]);
 
   const pinResponse = React.useCallback(() => {
@@ -6879,17 +6897,18 @@ function ResponseModal({
     <SheetModal
       visible={Boolean(target)}
       title="Last response"
-      onClose={onClose}
+      onClose={() => selection ? setSelection(null) : onClose()}
       onDismiss={onDismiss}
       tall
       wide
     >
+      <TextSelectionSurface target={selection} theme={theme} onClose={() => setSelection(null)}>
       <View style={styles.responseSheetMetaRow}>
         <Text style={styles.sheetMeta} numberOfLines={1}>
           {target ? agentTitle(target) : ""}
         </Text>
         <View style={styles.responseHeaderActions}>
-          <ActionButton icon={<TextSelect size={15} color={theme.colors.text} />} label={selectionText === null ? "Select text" : "Show formatted response"} onPress={() => setSelectionText(selectionText === null ? text : null)} />
+          <ActionButton icon={<TextSelect size={15} color={theme.colors.text} />} label="Select response text" onPress={() => setSelection({ title: "Last response", text })} />
           <ActionButton
             icon={<Send size={15} color={theme.colors.accent} />}
             label="Reply to session"
@@ -6926,7 +6945,8 @@ function ResponseModal({
         </View>
       </View>
       {pinStatus ? <Text style={styles.sheetMeta} numberOfLines={1}>{pinStatus}</Text> : null}
-      {selectionText !== null ? <SelectableTextPage text={selectionText} theme={theme} /> : <ScrollView style={styles.responseFullBox}>
+      <ScrollView style={styles.responseFullBox}>
+        <Pressable accessible={false} onLongPress={() => setSelection({ title: "Last response", text })} delayLongPress={550}>
         <Markdown
           style={markdownStyle}
           rules={markdownRules}
@@ -6934,7 +6954,9 @@ function ResponseModal({
         >
           {text || "No response."}
         </Markdown>
-      </ScrollView>}
+        </Pressable>
+      </ScrollView>
+      </TextSelectionSurface>
     </SheetModal>
   );
 }
@@ -7175,6 +7197,7 @@ function TranscriptModal({
   const api = useTmuxMobileApi();
   const pinArtifact = usePinInlineArtifact();
   const transcriptScrollRef = React.useRef<ScrollView | null>(null);
+  const [selection, setSelection] = React.useState<TextSelectionTarget | null>(null);
   const [data, setData] = React.useState<AgentTranscriptResponse | null>(null);
   const [error, setError] = React.useState("");
   const [pinStatus, setPinStatus] = React.useState("");
@@ -7196,7 +7219,7 @@ function TranscriptModal({
     [onOpenFile, target],
   );
   const markdownRules = React.useMemo(
-    () => createMarkdownPathRules(openTranscriptFile, { agent: target, selectable: true }),
+    () => createMarkdownPathRules(openTranscriptFile, { agent: target, selectable: false }),
     [openTranscriptFile, target],
   );
   const handleMarkdownLinkPress = React.useCallback(
@@ -7221,6 +7244,7 @@ function TranscriptModal({
   React.useEffect(() => {
     let cancelled = false;
     setData(null);
+    setSelection(null);
     setError("");
     setPinStatus("");
     setPinningTurn(null);
@@ -7289,12 +7313,22 @@ function TranscriptModal({
     <SheetModal
       visible={Boolean(target)}
       title="Transcript"
-      onClose={onClose}
+      onClose={() => selection ? setSelection(null) : onClose()}
       onDismiss={onDismiss}
       onShow={scrollTranscriptToBottom}
       tall
       wide
     >
+      <TextSelectionSurface target={selection} theme={theme} onClose={() => setSelection(null)}>
+      <View style={styles.responseSheetMetaRow}>
+        <Text style={[styles.sheetMeta, { flex: 1 }]}>Long-press a message to select text.</Text>
+        <ActionButton
+          icon={<TextSelect size={16} color={theme.colors.text} />}
+          label="Select entire transcript"
+          disabled={!turns.length}
+          onPress={() => setSelection({ title: "Transcript", text: transcriptSelectionText(turns) })}
+        />
+      </View>
       {loading ? <ActivityIndicator /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {pinStatus ? <Text style={styles.sheetMeta} numberOfLines={2}>{pinStatus}</Text> : null}
@@ -7322,6 +7356,11 @@ function TranscriptModal({
                 onPress={() => pinTranscriptTurn(turn, index)}
               />
             </View>
+            <Pressable
+              accessible={false}
+              onLongPress={() => setSelection({ title: `${turn.role || "turn"} · ${index + 1}`, text: turn.text || "" })}
+              delayLongPress={550}
+            >
             {turn.role === "assistant" ? (
               <Markdown
                 style={markdownStyle}
@@ -7334,13 +7373,15 @@ function TranscriptModal({
               <LinkedPathText
                 text={turn.text || ""}
                 style={styles.turnText}
-                selectable
+                selectable={false}
                 onOpenPath={openTranscriptFile}
               />
             )}
+            </Pressable>
           </View>
         ))}
       </ScrollView>
+      </TextSelectionSurface>
     </SheetModal>
   );
 }

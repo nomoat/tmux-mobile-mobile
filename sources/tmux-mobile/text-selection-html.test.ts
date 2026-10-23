@@ -11,4 +11,13 @@ describe('text selection document', () => {
     const html=textSelectionHtml(text, '#fff', '#000');
     expect(html).toContain(text);expect(html).toContain('FINAL_MARKER</pre>');
   });
+  it('enables native word selection with clear light and dark highlights', () => {
+    const light = textSelectionHtml('text', '#fdf6e3', '#586e75');
+    const dark = textSelectionHtml('text', '#002b36', '#93a1a1', true, true);
+    expect(light).toContain('-webkit-user-select:text');
+    expect(light).toContain('-webkit-touch-callout:default');
+    expect(light).toContain('::selection{background:#155c86;color:#fff}');
+    expect(dark).toContain('::selection{background:#b58900;color:#002b36}');
+    expect(dark).toContain('ui-monospace,Menlo,monospace');
+  });
 });

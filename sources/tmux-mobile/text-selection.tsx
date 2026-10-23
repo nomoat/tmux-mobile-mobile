@@ -6,12 +6,42 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppTheme } from '@/theme';
 import { textSelectionHtml } from './text-selection-html';
 
-export type TextSelectionTarget = { title: string; text: string };
-export function SelectableTextPage({ text, theme }: { text: string; theme: AppTheme }) {
-  const source = React.useMemo(() => ({ html: textSelectionHtml(text, theme.colors.background, theme.colors.text) }), [text, theme.colors.background, theme.colors.text]);
+export type TextSelectionTarget = { title: string; text: string; monospace?: boolean };
+export function SelectableTextPage({ text, theme, monospace = false }: { text: string; theme: AppTheme; monospace?: boolean }) {
+  const source = React.useMemo(() => ({ html: textSelectionHtml(text, theme.colors.background, theme.colors.text, theme.dark, monospace) }), [text, theme.colors.background, theme.colors.text, theme.dark, monospace]);
   return <WebView source={source} originWhitelist={['*']} javaScriptEnabled={false} dataDetectorTypes="none"
     onShouldStartLoadWithRequest={request => request.url === 'about:blank'}
     style={{ flex: 1, backgroundColor: theme.colors.background }} />;
+}
+/** Stay inside the existing sheet: iOS cannot reliably present a sibling Modal over it. */
+export function TextSelectionSurface({ target, theme, onClose, children }: {
+  target: TextSelectionTarget | null; theme: AppTheme; onClose: () => void; children: React.ReactNode;
+}) {
+  return <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} pointerEvents={target ? 'none' : 'auto'} accessibilityElementsHidden={Boolean(target)} importantForAccessibility={target ? 'no-hide-descendants' : 'auto'}>
+      {children}
+    </View>
+    {target ? <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background }]} accessibilityViewIsModal>
+      <TextSelectionPanel target={target} theme={theme} onClose={onClose} />
+    </View> : null}
+  </View>;
+}
+
+function TextSelectionPanel({ target, theme, onClose }: { target: TextSelectionTarget; theme: AppTheme; onClose: () => void }) {
+  const [copyLabel, setCopyLabel] = React.useState('Copy all');
+  React.useEffect(() => { setCopyLabel('Copy all'); }, [target]);
+  return <>
+    <View style={[styles.header, { borderColor: theme.colors.border }]}>
+      <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>{target.title}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Copy all text" style={styles.button} onPress={async () => {
+        try { await Clipboard.setStringAsync(target.text); setCopyLabel('Copied'); }
+        catch { setCopyLabel('Try again'); }
+      }}><Text style={{ color: theme.colors.accent }}>{copyLabel}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Return from text selection" style={styles.button} onPress={onClose}><Text style={{ color: theme.colors.accent }}>Done</Text></Pressable>
+    </View>
+    <Text style={{ color: theme.colors.textMuted, paddingHorizontal: 16, paddingVertical: 8 }}>Long-press a word, then drag the handles to select. This copy stays still while the session updates.</Text>
+    <SelectableTextPage text={target.text} theme={theme} monospace={target.monospace} />
+  </>;
 }
 export function TextSelectionModal({ target, theme, onClose }: { target: TextSelectionTarget | null; theme: AppTheme; onClose: () => void }) {
   const insets = useSafeAreaInsets();
