@@ -92,6 +92,7 @@ import {
   Info,
   KeyRound,
   Link2,
+  List,
   ListPlus,
   Laptop,
   LogOut,
@@ -1724,7 +1725,7 @@ function CommandCenterScreen() {
             <Terminal size={18} color={theme.colors.text} strokeWidth={2.2} />
           </View>
           <View style={styles.headerTitleBlock}>
-            <Text style={styles.title}>Sessions</Text>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Sessions</Text>
             <Text style={styles.headerMeta} numberOfLines={1}>
               {groupedAgents.sessionCount} sessions · {agents.length} windows
             </Text>
@@ -1736,6 +1737,19 @@ function CommandCenterScreen() {
             icon={<FileText size={19} color={theme.colors.text} />}
             onPress={() => setDraftsPath("/drafts?embedded=1")}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Jump to card"
+            accessibilityState={{ disabled: agents.length === 0, expanded: cardSearchVisible }}
+            disabled={agents.length === 0}
+            style={styles.iconButton}
+            onPress={() => {
+              setCardSearchAutoFocus(false);
+              setCardSearchVisible(true);
+            }}
+          >
+            <List size={19} color={agents.length ? theme.colors.text : theme.colors.textMuted} />
+          </Pressable>
           <IconButton
             label="Refresh"
             icon={<RefreshCcw size={19} color={theme.colors.text} />}
@@ -1768,23 +1782,6 @@ function CommandCenterScreen() {
         statsByMachine={machineChipStats.byMachine}
         onChange={selectMachineFilter}
       />
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Jump to card"
-        accessibilityState={{ disabled: agents.length === 0, expanded: cardSearchVisible }}
-        disabled={agents.length === 0}
-        onPress={() => {
-          setCardSearchAutoFocus(false);
-          setCardSearchVisible(true);
-        }}
-        style={[styles.cardJump, agents.length === 0 ? { opacity: 0.55 } : null]}
-      >
-        <Text style={styles.cardJumpLabel} numberOfLines={1}>
-          {agents.length ? `Jump to card (${agents.length})` : "No cards"}
-        </Text>
-        <ChevronDown size={16} color={theme.colors.textMuted} />
-      </Pressable>
 
       {commandCenter.error ? (
         <View style={styles.errorBox}>
@@ -9437,26 +9434,6 @@ function createStyles(
     height: 1,
     marginVertical: 4,
     backgroundColor: theme.colors.border,
-  },
-  cardJump: {
-    minHeight: 44,
-    maxWidth: 360,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    backgroundColor: theme.colors.surface,
-  },
-  cardJumpLabel: {
-    flex: 1,
-    fontSize: 16,
-    color: theme.colors.text,
   },
   cardSearchHint: {
     ...theme.typography.meta,
