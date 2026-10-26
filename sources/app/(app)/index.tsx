@@ -865,6 +865,7 @@ function CommandCenterScreen() {
     void Haptics.selectionAsync();
   }, []);
   const [cardSearchVisible, setCardSearchVisible] = React.useState(false);
+  const [cardSearchAutoFocus, setCardSearchAutoFocus] = React.useState(false);
   const [pinsVisible, setPinsVisible] = React.useState(false);
   const [shareTarget, setShareTarget] = React.useState<AgentSession | null>(null);
   const pendingTemporaryPath = React.useRef<string | null>(null);
@@ -1541,6 +1542,7 @@ function CommandCenterScreen() {
 
       if (shortcut.type === "search") {
         e.preventDefault?.();
+        setCardSearchAutoFocus(true);
         setCardSearchVisible(true);
         return;
       }
@@ -1771,7 +1773,10 @@ function CommandCenterScreen() {
         accessibilityLabel="Jump to card"
         accessibilityState={{ disabled: agents.length === 0, expanded: cardSearchVisible }}
         disabled={agents.length === 0}
-        onPress={() => setCardSearchVisible(true)}
+        onPress={() => {
+          setCardSearchAutoFocus(false);
+          setCardSearchVisible(true);
+        }}
         style={[styles.cardJump, agents.length === 0 ? { opacity: 0.55 } : null]}
       >
         <Text style={styles.cardJumpLabel} numberOfLines={1}>
@@ -2016,6 +2021,7 @@ function CommandCenterScreen() {
       />
       <CardSearchModal
         visible={cardSearchVisible}
+        autoFocusSearch={cardSearchAutoFocus}
         agents={agents}
         selectedAgent={selectedAgent}
         onSelect={jumpToAgent}
@@ -2960,12 +2966,14 @@ function IconButton({
 
 function CardSearchModal({
   visible,
+  autoFocusSearch,
   agents,
   selectedAgent,
   onSelect,
   onClose,
 }: {
   visible: boolean;
+  autoFocusSearch: boolean;
   agents: AgentSession[];
   selectedAgent: AgentSession | null;
   onSelect: (agent: AgentSession) => void;
@@ -3024,7 +3032,7 @@ function CardSearchModal({
       onClose={onClose}
     >
       <KeyboardTextInput
-        autoFocus={false}
+        autoFocus={visible && autoFocusSearch}
         value={query}
         onChangeText={(value) => {
           setQuery(value);
