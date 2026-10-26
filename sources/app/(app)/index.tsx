@@ -832,6 +832,11 @@ function CommandCenterScreen() {
   const pendingFileTarget = React.useRef<AgentFileTarget | null>(null);
   const filePreviewOrigin = React.useRef<FilePreviewOrigin | null>(null);
   const agentListRef = React.useRef<FlatList<AgentSessionGroup>>(null);
+  const listViewportRef = React.useRef<View>(null);
+  const cardViews = React.useRef(new Map<string, View>());
+  const listScrollOffset = React.useRef(0);
+  const jumpGeneration = React.useRef(0);
+  const jumpTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const shortcutReadGeneration = React.useRef(0);
   const shortcutReadAbort = React.useRef<AbortController | null>(null);
   const shortcutActiveRead = React.useRef<{
@@ -1249,6 +1254,46 @@ function CommandCenterScreen() {
     const selectedKey = selectedAgent ? agentCardKey(selectedAgent) : "";
     return agents.find((agent) => agentCardKey(agent) === selectedKey) || agents[0] || null;
   }, [agents, selectedAgent]);
+
+  const jumpToAgent = React.useCallback((agent: AgentSession) => {
+    const key = agentCardKey(agent);
+    if (!agents.some((candidate) => agentCardKey(candidate) === key)) return;
+    const index = groupIndexForAgent(sessionGroups, agent);
+    const generation = ++jumpGeneration.current;
+    if (jumpTimer.current) clearTimeout(jumpTimer.current);
+    setSelectedAgent(agent);
+    setExpandedAgentKey(key);
+    setCardSearchVisible(false);
+    // FlatList virtualizes session groups, not individual cards. First mount
+    // the group, then measure the actual card so long groups land precisely.
+    const locate = (attempt: number) => {
+      if (generation !== jumpGeneration.current || attempt > 12) return;
+      jumpTimer.current = setTimeout(() => locate(attempt + 1), 120);
+      const card = cardViews.current.get(key);
+      if (!card) {
+        agentListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+        return;
+      }
+      listViewportRef.current?.measureInWindow((_x, listY) => {
+        card.measureInWindow((_cardX, cardY, _width, height) => {
+          if (!height || generation !== jumpGeneration.current) return;
+          if (jumpTimer.current) clearTimeout(jumpTimer.current);
+          agentListRef.current?.scrollToOffset({
+            offset: Math.max(0, listScrollOffset.current + cardY - listY - 8),
+            animated: false,
+          });
+        });
+      });
+    };
+    // Let the selected card expand before measuring its final position.
+    jumpTimer.current = setTimeout(() => locate(0), 80);
+    void Haptics.selectionAsync();
+  }, [agents, sessionGroups]);
+
+  React.useEffect(() => () => {
+    jumpGeneration.current++;
+    if (jumpTimer.current) clearTimeout(jumpTimer.current);
+  }, []);
 
   const moveSelectedAgent = React.useCallback(
     (direction: "left" | "right" | "up" | "down") => {
@@ -1721,6 +1766,20 @@ function CommandCenterScreen() {
         onChange={selectMachineFilter}
       />
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Jump to card"
+        accessibilityState={{ disabled: agents.length === 0, expanded: cardSearchVisible }}
+        disabled={agents.length === 0}
+        onPress={() => setCardSearchVisible(true)}
+        style={[styles.cardJump, agents.length === 0 ? { opacity: 0.55 } : null]}
+      >
+        <Text style={styles.cardJumpLabel} numberOfLines={1}>
+          {agents.length ? `Jump to card (${agents.length})` : "No cards"}
+        </Text>
+        <ChevronDown size={16} color={theme.colors.textMuted} />
+      </Pressable>
+
       {commandCenter.error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{commandCenter.error.message}</Text>
@@ -1732,8 +1791,11 @@ function CommandCenterScreen() {
         </View>
       ) : null}
 
+      <View ref={listViewportRef} style={styles.listViewport} collapsable={false}>
       <FlatList
         ref={agentListRef}
+        onScroll={(event) => { listScrollOffset.current = event.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         data={sessionGroups}
         keyExtractor={(group) => group.key}
         onScrollToIndexFailed={({ index, averageItemLength }) => {
@@ -1799,7 +1861,14 @@ function CommandCenterScreen() {
                 };
                 return (
                   <React.Fragment key={key}>
-                    <View style={styles.cardGridItem}>
+                    <View
+                      style={styles.cardGridItem}
+                      collapsable={false}
+                      ref={(view) => {
+                        if (view) cardViews.current.set(key, view);
+                        else cardViews.current.delete(key);
+                      }}
+                    >
                       <AgentCard
                         agent={item}
                         nowMs={relativeTimeNow}
@@ -1883,6 +1952,7 @@ function CommandCenterScreen() {
           </View>
         )}
       />
+      </View>
 
       <Pressable
         accessibilityRole="button"
@@ -1948,20 +2018,7 @@ function CommandCenterScreen() {
         visible={cardSearchVisible}
         agents={agents}
         selectedAgent={selectedAgent}
-        onSelect={(agent) => {
-          const nextIndex = agents.findIndex(
-            (candidate) => agentCardKey(candidate) === agentCardKey(agent),
-          );
-          setSelectedAgent(agent);
-          setCardSearchVisible(false);
-          if (nextIndex >= 0) {
-            agentListRef.current?.scrollToIndex({
-              index: Math.floor(nextIndex / Math.max(1, layout.listColumns)),
-              animated: true,
-              viewPosition: 0.5,
-            });
-          }
-        }}
+        onSelect={jumpToAgent}
         onClose={() => setCardSearchVisible(false)}
       />
       {shareTarget && api ? <TerminalShareModal key={agentCardKey(shareTarget)} api={api} target={shareTarget} theme={theme} onClose={() => setShareTarget(null)} /> : null}
@@ -2916,7 +2973,6 @@ function CardSearchModal({
 }) {
   const theme = useAppTheme();
   const styles = useAppStyles();
-  const visionControls = useVisionControls();
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const selectedKey = selectedAgent ? agentCardKey(selectedAgent) : "";
@@ -2959,18 +3015,16 @@ function CardSearchModal({
     if (agent) onSelect(agent);
   }, [onSelect, results, selectedIndex]);
 
-  if (visionControls) return null;
-
   return (
     <SheetModal
       visible={visible}
-      title="Find session"
+      title="Jump to card"
       tall
       wide
       onClose={onClose}
     >
       <KeyboardTextInput
-        autoFocus={visible}
+        autoFocus={false}
         value={query}
         onChangeText={(value) => {
           setQuery(value);
@@ -3034,6 +3088,8 @@ function CardSearchModal({
                 {[
                   item.machineHostname || agentMachineKey(item),
                   item.sessionName,
+                  item.windowName,
+                  item.windowId,
                   item.cwd,
                 ]
                   .filter(Boolean)
@@ -9359,6 +9415,26 @@ function createStyles(
     height: 1,
     marginVertical: 4,
     backgroundColor: theme.colors.border,
+  },
+  cardJump: {
+    minHeight: 44,
+    maxWidth: 360,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surface,
+  },
+  cardJumpLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: theme.colors.text,
   },
   cardSearchHint: {
     ...theme.typography.meta,
