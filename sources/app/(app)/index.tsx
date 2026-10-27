@@ -1,3 +1,4 @@
+import { useStreamingDictation } from "@/tmux-mobile/use-streaming-dictation";
 import { CardActionBar, CardActionIcon } from "@/tmux-mobile/card-action-bar";
 import { TextSelectionSurface, TextSelectionModal, type TextSelectionTarget } from "@/tmux-mobile/text-selection";
 import { useAppDialog } from "@/tmux-mobile/app-dialog";
@@ -88,6 +89,7 @@ import {
   FileText,
   Folder,
   Image as ImageIcon,
+  AudioLines,
   ImagePlus,
   Info,
   KeyRound,
@@ -4157,6 +4159,9 @@ function PaneComposer({
   onChangeText,
   onSend,
   onToggleVoice,
+  onToggleStreaming,
+  streamingActive = false,
+  streamingBusy = false,
   onOpenKeys,
   onQuickKey,
   onOpenUpload,
@@ -4190,6 +4195,9 @@ function PaneComposer({
   onChangeText: (value: string) => void;
   onSend: () => void;
   onToggleVoice: () => void;
+  onToggleStreaming?: () => void;
+  streamingActive?: boolean;
+  streamingBusy?: boolean;
   onOpenKeys: () => void;
   onQuickKey?: (entry: TerminalKeyEntry) => void;
   onOpenUpload?: () => void;
@@ -4228,13 +4236,13 @@ function PaneComposer({
   const controlDisabled = disabled || busy;
   const sendIsDisabled = disabled || sendDisabled || sendBusy || keyBusy;
   const standardVoiceRecording = voiceRecording ?? recognizing;
-  const standardVoiceActive = standardVoiceRecording || voiceTranscribing;
+  const standardVoiceActive = standardVoiceRecording || voiceTranscribing || streamingActive;
   const standardActionDisabled = controlDisabled || standardVoiceActive;
   const standardSendIsDisabled = sendIsDisabled || standardVoiceActive;
-  const standardStatus = standardVoiceActive ? "" : status;
-  const visionSendIsDisabled = value.trim()
+  const standardStatus = (standardVoiceRecording || voiceTranscribing) ? "" : status;
+  const visionSendIsDisabled = streamingActive || (value.trim()
     ? sendIsDisabled
-    : disabled || sendBusy || keyBusy || !onQuickKey;
+    : disabled || sendBusy || keyBusy || !onQuickKey);
   const iconColor = controlDisabled ? theme.colors.textMuted : theme.colors.text;
   const activeIconColor = theme.colors.accent;
   const showClear = expanded && Boolean(onClear);
@@ -4299,9 +4307,9 @@ function PaneComposer({
       style={[
         expanded ? styles.paneComposerInlineButton : styles.paneComposerIconButton,
         recognizing ? (expanded ? styles.paneComposerInlineButtonActive : styles.paneComposerIconButtonActive) : null,
-        controlDisabled ? styles.disabledButton : null,
+        controlDisabled || streamingActive ? styles.disabledButton : null,
       ]}
-      disabled={controlDisabled}
+      disabled={controlDisabled || streamingActive}
       onPress={onToggleVoice}
     >
       {recognizing ? (
@@ -4315,6 +4323,24 @@ function PaneComposer({
       )}
     </Pressable>
   );
+
+  const streamingButton = onToggleStreaming ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={streamingActive ? "Stop live dictation" : "Live dictation (Free ASR)"}
+      accessibilityHint="Show words as you speak. Stop to finish; Send is separate."
+      accessibilityState={{ selected: streamingActive, disabled: controlDisabled || recognizing || streamingBusy }}
+      style={[
+        expanded ? styles.paneComposerInlineButton : styles.paneComposerIconButton,
+        streamingActive ? styles.paneComposerInlineButtonActive : null,
+        controlDisabled || recognizing || streamingBusy ? styles.disabledButton : null,
+      ]}
+      disabled={controlDisabled || recognizing || streamingBusy}
+      onPress={onToggleStreaming}
+    >
+      {streamingBusy ? <ActivityIndicator size="small" color={theme.colors.text} /> : <AudioLines size={18} color={streamingActive ? activeIconColor : iconColor} />}
+    </Pressable>
+  ) : null;
 
   const keysButton = (
     <Pressable
@@ -4358,6 +4384,7 @@ function PaneComposer({
   const input = presentation.mountTextInput ? (
     <KeyboardTextInput
       value={value}
+      editable={!streamingActive && !disabled}
       onChangeText={onChangeText}
       multiline={multiline ?? expanded}
       autoFocus={autoFocus}
@@ -4366,8 +4393,8 @@ function PaneComposer({
       returnKeyType="send"
       showSoftInputOnFocus
       submitBehavior="submit"
-      onSubmitEditing={onSend}
-      onKeyPress={onKeyPress}
+      onSubmitEditing={streamingActive ? undefined : onSend}
+      onKeyPress={streamingActive ? undefined : onKeyPress}
       style={[
         styles.paneComposerInput,
         expanded ? styles.paneComposerInputExpanded : styles.paneComposerInputCompact,
@@ -4525,14 +4552,15 @@ function PaneComposer({
           </Text>
         </View>
         <View style={styles.visionComposerPrimaryRow}>
+          {streamingButton}
           <Pressable
             accessibilityLabel={recognizing ? "Stop voice input" : "Start voice input"}
             style={[
               styles.visionComposerVoiceButton,
               recognizing ? styles.visionVoiceButtonActive : null,
-              controlDisabled ? styles.disabledButton : null,
+              controlDisabled || streamingActive ? styles.disabledButton : null,
             ]}
-            disabled={controlDisabled}
+            disabled={controlDisabled || streamingActive}
             onPress={onToggleVoice}
           >
             {recognizing ? (
@@ -4554,9 +4582,9 @@ function PaneComposer({
               accessibilityLabel="Clear voice draft"
               style={[
                 styles.visionComposerSquareButton,
-                !value || controlDisabled ? styles.disabledButton : null,
+                !value || controlDisabled || streamingActive ? styles.disabledButton : null,
               ]}
-              disabled={!value || controlDisabled}
+              disabled={!value || controlDisabled || streamingActive}
               onPress={() => {
                 onClear();
                 void Haptics.selectionAsync();
@@ -4647,9 +4675,9 @@ function PaneComposer({
                   accessibilityLabel="Open all terminal keys"
                   style={[
                     styles.visionQuickKeyButton,
-                    controlDisabled ? styles.disabledButton : null,
+                    controlDisabled || streamingActive ? styles.disabledButton : null,
                   ]}
-                  disabled={controlDisabled}
+                  disabled={controlDisabled || streamingActive}
                   onPress={onOpenKeys}
                 >
                   <Terminal size={19} color={iconColor} />
@@ -4673,9 +4701,9 @@ function PaneComposer({
               style={[
                 styles.retryButton,
                 styles.visionRetryButton,
-                retryDisabled ? styles.disabledButton : null,
+                retryDisabled || streamingActive ? styles.disabledButton : null,
               ]}
-              disabled={retryDisabled}
+              disabled={retryDisabled || streamingActive}
               onPress={onRetry}
             >
               <RefreshCcw size={18} color={theme.colors.surfaceRaised} />
@@ -4720,6 +4748,8 @@ function PaneComposer({
               {keysButton}
               {promptToggleButton}
               {clearButton}
+              {voiceButton}
+              {streamingButton}
               {sendButton}
             </View>
           </View>
@@ -4734,8 +4764,8 @@ function PaneComposer({
                 {error}
               </Text>
               <Pressable
-                style={[styles.retryButton, retryDisabled ? styles.disabledButton : null]}
-                disabled={retryDisabled}
+                style={[styles.retryButton, retryDisabled || streamingActive ? styles.disabledButton : null]}
+                disabled={retryDisabled || streamingActive}
                 onPress={onRetry}
               >
                 <RefreshCcw size={14} color={theme.colors.surfaceRaised} />
@@ -4747,6 +4777,7 @@ function PaneComposer({
       ) : (
         <View style={styles.paneComposerCompactRow}>
           {voiceButton}
+          {streamingButton}
           {keysButton}
           {input}
           {sendButton}
@@ -4874,6 +4905,7 @@ function PaneComposer({
 }
 
 function SendModal({ target, onClose }: { target: AgentSession | null; onClose: () => void }) {
+  const api = useTmuxMobileApi();
   const theme = useAppTheme();
   const styles = useAppStyles();
   const sendText = useSendText();
@@ -4933,6 +4965,8 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
     onStatus: setStatus,
     contextualStrings: VOICE_CONTEXTUAL_STRINGS,
   });
+
+  const streamingInput = useStreamingDictation({ api, scopeKey: targetScopeKey, value: text, onChangeText: setText, onStatus: setStatus });
 
   const uploadAssets = React.useCallback(async (
     assets: Array<{ uri: string; name?: string | null; mimeType?: string | null }>,
@@ -5096,6 +5130,9 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
           clearSendFailure();
         }}
         onRetry={retrySend}
+        onToggleStreaming={() => { void streamingInput.toggle(); }}
+        streamingActive={streamingInput.active}
+        streamingBusy={streamingInput.busy}
         recognizing={voiceInput.active}
         voiceRecording={voiceInput.recording}
         voiceTranscribing={voiceInput.transcribing}
@@ -6316,6 +6353,8 @@ function WindowViewModal({
     contextualStrings: VOICE_CONTEXTUAL_STRINGS,
   });
 
+  const terminalStreamingInput = useStreamingDictation({ api, scopeKey: terminalScopeKey, value: terminalInput, onChangeText: setTerminalInput, onStatus: setStatus });
+
   const uploadTerminalAssets = React.useCallback(async (
     assets: Array<{ uri: string; name?: string | null; mimeType?: string | null }>,
     label: string,
@@ -6797,6 +6836,9 @@ function WindowViewModal({
         clearInline
         singleShell={windowWidth < 760}
         onRetry={() => sendTerminalInput({ submit: true })}
+        onToggleStreaming={() => { void terminalStreamingInput.toggle(); }}
+        streamingActive={terminalStreamingInput.active}
+        streamingBusy={terminalStreamingInput.busy}
         recognizing={terminalVoiceInput.active}
         voiceRecording={terminalVoiceInput.recording}
         voiceTranscribing={terminalVoiceInput.transcribing}
