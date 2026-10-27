@@ -104,7 +104,9 @@ export function useStreamingDictation({
     if (state.cleanup) return state.cleanup;
     clearInterval(state.timer);
     state.cleanup = (async () => {
+      // A cancelled permission/start request may still be completing.
       await state.setup;
+      clearInterval(state.timer);
       try {
         state.stream?.stop();
       } catch {}
@@ -202,6 +204,7 @@ export function useStreamingDictation({
     state.setup = (async () => {
       try {
         await pendingCleanup.current;
+        if (!valid()) return;
         const permission = await requestRecordingPermissionsAsync();
         if (!valid()) return;
         if (!permission.granted)
