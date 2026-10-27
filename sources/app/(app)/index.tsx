@@ -8,6 +8,7 @@ import { TerminalShareModal } from "@/tmux-mobile/terminal-share-modal";
 import { canShareTerminal } from "@/tmux-mobile/terminal-share";
 import { sessionDraftsPath } from "@/tmux-mobile/drafts-navigation";
 import { DraftsModal } from "@/tmux-mobile/drafts-modal";
+import { FpsModal as Modal, FpsMenuToggle } from "@/tmux-mobile/fps-monitor";
 import { NotificationSettings } from "@/tmux-mobile/notification-settings";
 import { conversationPath } from "@/tmux-mobile/conversation-link";
 import * as React from "react";
@@ -19,7 +20,6 @@ import {
   Image,
   Keyboard,
   Linking,
-  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -3098,6 +3098,7 @@ function CommandMenu({
             label="Settings & updates"
             onPress={onSettings}
           />
+          <FpsMenuToggle theme={theme} />
           <View style={{ paddingHorizontal: 12, paddingVertical: 6, gap: 8 }}>
             <Text style={[styles.menuActionText, { color: theme.colors.textMuted }]}>Theme</Text>
             <View style={styles.segmentRow}>

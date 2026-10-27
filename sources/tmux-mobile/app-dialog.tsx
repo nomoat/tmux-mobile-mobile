@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, type AlertButton } from 'react-native';
+import { FpsModal as Modal } from './fps-monitor';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type AlertButton } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppTheme } from '@/theme';
 
