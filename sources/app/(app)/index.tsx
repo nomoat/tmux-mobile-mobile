@@ -1961,15 +1961,22 @@ function CommandCenterScreen() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Start agent"
+        accessibilityLabel="Sessions"
+        accessibilityHint="Open the session list and jump to a card"
+        accessibilityState={{ disabled: agents.length === 0, expanded: cardSearchVisible }}
+        disabled={agents.length === 0}
         style={({ pressed }) => [
-          styles.newSessionFab,
+          styles.sessionListFab,
           { bottom: insets.bottom + 18 },
-          pressed ? styles.newSessionFabPressed : null,
+          agents.length === 0 ? { opacity: 0.5 } : null,
+          pressed ? styles.sessionListFabPressed : null,
         ]}
-        onPress={openStartAgent}
+        onPress={() => {
+          setCardSearchAutoFocus(false);
+          setCardSearchVisible(true);
+        }}
       >
-        <Plus size={22} color={theme.dark ? theme.colors.background : theme.colors.surface} strokeWidth={2.4} />
+        <List size={22} color={theme.dark ? theme.colors.background : theme.colors.surface} strokeWidth={2.4} />
       </Pressable>
 
       <TextSelectionModal target={textSelection} theme={theme} onClose={() => setTextSelection(null)} />
@@ -4962,8 +4969,8 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
             type: asset.mimeType || "application/octet-stream",
           },
         });
-        if (uploaded.path) {
-          appendText(uploaded.path);
+        if (uploaded.url || uploaded.path) {
+          appendText((uploaded.url || uploaded.path)!);
           count += 1;
         }
       }
@@ -6344,8 +6351,8 @@ function WindowViewModal({
             type: asset.mimeType || "application/octet-stream",
           },
         });
-        if (uploaded.path) {
-          appendTerminalInput(uploaded.path);
+        if (uploaded.url || uploaded.path) {
+          appendTerminalInput((uploaded.url || uploaded.path)!);
           count += 1;
         }
       }
@@ -9379,7 +9386,7 @@ function createStyles(
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.accentSoft,
   },
-	  newSessionFab: {
+	  sessionListFab: {
 	    position: "absolute",
 	    right: Math.max(layout.gutter, (layout.width - layout.contentMaxWidth) / 2 + layout.gutter),
 	    width: 52,
@@ -9394,7 +9401,7 @@ function createStyles(
 	    shadowOffset: { width: 0, height: 7 },
 	    elevation: 8,
 	  },
-	  newSessionFabPressed: {
+	  sessionListFabPressed: {
 	    opacity: 0.72,
 	    transform: [{ scale: 0.96 }],
 	  },

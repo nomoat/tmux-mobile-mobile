@@ -123,3 +123,16 @@ to the original reading position. Terminal polling pauses during selection;
 copying removes ANSI controls and keeps all captured lines. Light and dark
 selection colors remain readable. Ship this JavaScript-only change to runtime 7
 iOS/Android and runtime 6 Android from its own checkout and dependencies.
+
+## Session picker and temporary uploads (2026-10-27)
+
+The lower-right floating List button opens the same session picker as the header.
+It lists the current cards by most recent activity, shows relative times and jumps
+to the chosen card. Start agent remains available in More.
+
+File attachments stream from disk directly to S3 using a Controller-issued
+30-minute upload URL. After completion, the composer receives a download link
+that expires two hours after upload. Neither the Controller nor the Connector
+relays file bytes. The old upload endpoint is retained only for local/older
+Controllers; native fallback also avoids Base64 buffering. No native dependency
+change is needed: ship runtime 7 iOS/Android and the runtime 6 Android backport.
