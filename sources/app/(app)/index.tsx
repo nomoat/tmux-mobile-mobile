@@ -8972,7 +8972,7 @@ function createStyles(
 	    gap: 0,
 	  },
 	  cardMuted: {
-	    opacity: 0.62,
+	    opacity: theme.dark ? 0.86 : 0.62,
 	  },
 	  cardRunning: {
 	    borderColor: theme.colors.orange,

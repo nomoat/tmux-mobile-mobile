@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-// Solarized, shared with the T-Max Web palette.
+// Solarized surfaces and high-contrast dark text, shared with T-Max Web.
 const palette = {
   canvas: "#fdf6e3",
   panel: "#fdf6e3",
@@ -17,8 +17,8 @@ const palette = {
   darkPaper: "#002b36",
   darkRaised: "#073642",
   darkLine: "#586e75",
-  darkText: "#93a1a1",
-  darkMuted: "#839496",
+  darkText: "#eee8d5",
+  darkMuted: "#c0cdcd",
 };
 
 export const spacing = {
@@ -115,7 +115,7 @@ export const darkTheme = {
     border: palette.darkLine,
     text: palette.darkText,
     textMuted: palette.darkMuted,
-    accent: "#93a1a1",
+    accent: palette.darkText,
     accentSoft: "#073642",
     orange: "#cb4b16",
     success: "#859900",
