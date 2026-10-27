@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FpsModal as Modal } from './fps-monitor';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

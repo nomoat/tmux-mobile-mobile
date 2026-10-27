@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
+import { FpsMonitor } from "@/tmux-mobile/fps-monitor";
 import { TmuxMobileAuthProvider } from "@/tmux-mobile/auth";
 import { lightTheme as theme } from "@/theme";
 
@@ -66,6 +67,7 @@ export default function RootLayout() {
             <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
               <StatusBar style={theme.dark ? "light" : "dark"} />
               <Stack screenOptions={{ headerShown: false }} />
+              <FpsMonitor />
             </GestureHandlerRootView>
           </KeyboardProvider>
         </SafeAreaProvider>

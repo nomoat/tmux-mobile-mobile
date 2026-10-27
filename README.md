@@ -116,3 +116,21 @@ stream new bytes from one AAC ADTS/WAV recording through the Controller decoder.
 No native dependency changes are needed. Ship runtime 7 iOS/Android and runtime 6
 Android independently. `streaming-asr-session.js` matches the Web source at
 `tmux-mobile/public/streaming-asr-session.js`; keep both copies synchronized.
+
+## App FPS monitor (2026-10-27)
+
+More → Show FPS toggles a small, touch-through readout in iOS and Android,
+including Terminal, Transcript, Drafts and other native sheets. It defaults off
+and remembers the local preference. UI FPS samples Reanimated's UI-thread frame
+callbacks; JS FPS samples JavaScript requestAnimationFrame. Values cover roughly
+one second and support variable refresh rates; long stalls are included. These
+are thread callback rates, not GPU presentation counts or a WebView's internal
+JavaScript frame rate. A blocked JS thread can delay the displayed update.
+
+There is one sampler regardless of how many sheets are open. Only the readouts
+subscribe to measurements; screens do not re-render for each sample. Turning the
+monitor off or leaving the foreground cancels both loops. Resuming starts a fresh
+sample, excluding background time. No telemetry is stored or transmitted. The
+browser UI is unchanged. This uses the Reanimated module already in both binaries;
+publish runtime 7 iOS/Android OTA and the runtime 6 Android backport from its own
+lockfile, without native dependency changes.
