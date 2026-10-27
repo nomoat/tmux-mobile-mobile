@@ -44,7 +44,7 @@ function compareWindows(left: AgentSession, right: AgentSession): number {
   return compareText(agentCardKey(left), agentCardKey(right));
 }
 
-function activityTime(agent: AgentSession): number {
+export function latestActivityTime(agent: AgentSession): number {
   const values = [agent.lastActivityAt, agent.lastAssistantAt, agent.lastUserAt];
   return values.reduce((latest, value) => {
     const time = Date.parse(String(value || ""));
@@ -52,8 +52,12 @@ function activityTime(agent: AgentSession): number {
   }, 0);
 }
 
+export function compareRecentActivity(left: AgentSession, right: AgentSession): number {
+  return latestActivityTime(right) - latestActivityTime(left);
+}
+
 function compareStarred(left: AgentSession, right: AgentSession): number {
-  const activityOrder = activityTime(right) - activityTime(left);
+  const activityOrder = compareRecentActivity(left, right);
   return activityOrder || compareWindows(left, right);
 }
 

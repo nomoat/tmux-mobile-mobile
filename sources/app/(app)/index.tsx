@@ -188,6 +188,8 @@ import {
 import {
   CARD_SORT_KEY,
   normalizeCardSort,
+  latestActivityTime,
+  compareRecentActivity,
   type CardSort,
   groupAgentSessions,
   groupIndexForAgent,
@@ -2021,6 +2023,7 @@ function CommandCenterScreen() {
         visible={cardSearchVisible}
         autoFocusSearch={cardSearchAutoFocus}
         agents={agents}
+        nowMs={relativeTimeNow}
         selectedAgent={selectedAgent}
         onSelect={jumpToAgent}
         onClose={() => setCardSearchVisible(false)}
@@ -2972,6 +2975,7 @@ function CardSearchModal({
   visible,
   autoFocusSearch,
   agents,
+  nowMs,
   selectedAgent,
   onSelect,
   onClose,
@@ -2979,6 +2983,7 @@ function CardSearchModal({
   visible: boolean;
   autoFocusSearch: boolean;
   agents: AgentSession[];
+  nowMs: number;
   selectedAgent: AgentSession | null;
   onSelect: (agent: AgentSession) => void;
   onClose: () => void;
@@ -2988,10 +2993,11 @@ function CardSearchModal({
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const selectedKey = selectedAgent ? agentCardKey(selectedAgent) : "";
+  const recentAgents = React.useMemo(() => [...agents].sort(compareRecentActivity), [agents]);
   const results = React.useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    if (!needle) return agents;
-    return agents.filter((agent) =>
+    if (!needle) return recentAgents;
+    return recentAgents.filter((agent) =>
       [
         agentTitle(agent),
         agent.machineHostname,
@@ -3005,16 +3011,16 @@ function CardSearchModal({
         .toLocaleLowerCase()
         .includes(needle),
     );
-  }, [agents, query]);
+  }, [recentAgents, query]);
 
   React.useEffect(() => {
     if (!visible) return;
     setQuery("");
-    const index = agents.findIndex(
+    const index = recentAgents.findIndex(
       (agent) => agentCardKey(agent) === selectedKey,
     );
     setSelectedIndex(index >= 0 ? index : 0);
-  }, [agents, selectedKey, visible]);
+  }, [recentAgents, selectedKey, visible]);
 
   React.useEffect(() => {
     setSelectedIndex((current) =>
@@ -3074,6 +3080,7 @@ function CardSearchModal({
       </Text>
       <FlatList
         data={results}
+        extraData={nowMs}
         keyExtractor={agentCardKey}
         keyboardShouldPersistTaps="handled"
         style={styles.cardSearchList}
@@ -3083,6 +3090,8 @@ function CardSearchModal({
         }
         renderItem={({ item, index }) => {
           const active = index === selectedIndex;
+          const activityTime = latestActivityTime(item);
+          const age = relativeTimeLabel(activityTime ? new Date(activityTime).toISOString() : null, nowMs) || "No activity";
           return (
             <Pressable
               accessibilityRole="button"
@@ -3093,9 +3102,12 @@ function CardSearchModal({
               ]}
               onPress={() => onSelect(item)}
             >
-              <Text style={styles.cardSearchResultTitle} numberOfLines={1}>
-                {agentTitle(item)}
-              </Text>
+              <View style={styles.cardSearchResultHeading}>
+                <Text style={styles.cardSearchResultTitle} numberOfLines={1}>
+                  {agentTitle(item)}
+                </Text>
+                <Text style={styles.cardSearchResultAge}>{age}</Text>
+              </View>
               <Text style={styles.cardSearchResultMeta} numberOfLines={1}>
                 {[
                   item.machineHostname || agentMachineKey(item),
@@ -9465,9 +9477,21 @@ function createStyles(
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.accentSoft,
   },
+  cardSearchResultHeading: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+  },
   cardSearchResultTitle: {
     ...theme.typography.section,
     color: theme.colors.text,
+    flex: 1,
+    minWidth: 0,
+  },
+  cardSearchResultAge: {
+    ...theme.typography.meta,
+    color: theme.colors.textMuted,
+    flexShrink: 0,
   },
   cardSearchResultMeta: {
     ...theme.typography.meta,

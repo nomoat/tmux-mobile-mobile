@@ -3,6 +3,8 @@ import { agentStarKey, type AgentSession } from "@/tmux-mobile/types";
 import {
   groupAgentSessions,
   normalizeCardSort,
+  latestActivityTime,
+  compareRecentActivity,
   groupIndexForAgent,
   nextExpandedAgentKey,
 } from "@/tmux-mobile/session-groups";
@@ -87,6 +89,23 @@ describe("groupAgentSessions", () => {
 
     expect(groupIndexForAgent(groups, second)).toBe(1);
     expect(groupIndexForAgent(groups, first)).toBe(0);
+  });
+
+  it("sorts picker entries only by latest activity without changing starred feed order", () => {
+    const source = [
+      agent({ windowId: "@star", lastActivityAt: "2026-09-10T12:00:00Z" }),
+      agent({ windowId: "@missing", windowIndex: 1, lastActivityAt: "invalid" }),
+      agent({ windowId: "@assistant", windowIndex: 2, lastActivityAt: "invalid", lastAssistantAt: "2026-09-13T12:00:00Z" }),
+      agent({ windowId: "@user", windowIndex: 3, lastActivityAt: "2026-09-12T12:00:00Z", lastUserAt: "2026-09-14T12:00:00Z" }),
+    ];
+    for (const sortBy of ["current", "recent"] as const) {
+      const feed = groupAgentSessions(source, new Set([agentStarKey(source[0])]), [], sortBy).agents;
+      expect([...feed].sort(compareRecentActivity).map(a => a.windowId)).toEqual(["@user", "@assistant", "@star", "@missing"]);
+      expect(feed[0].windowId).toBe("@star");
+    }
+    expect(latestActivityTime(source[3])).toBe(Date.parse("2026-09-14T12:00:00Z"));
+    expect(latestActivityTime(source[1])).toBe(0);
+    expect(compareRecentActivity(source[0], { ...source[0], windowIndex: 99 })).toBe(0);
   });
 });
 
