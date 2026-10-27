@@ -1,3 +1,14 @@
+export type StreamingDictationMode =
+  | "idle"
+  | "connecting"
+  | "recording"
+  | "finishing";
+export function streamingDictationControl(mode: StreamingDictationMode): {
+  label: string;
+  hint: string;
+  icon: "wave" | "cancel" | "stop" | "spinner";
+  disabled: boolean;
+};
 export function dictationText(base: string, text: string): string;
 export function createPcmResampler(
   sampleRate: number,

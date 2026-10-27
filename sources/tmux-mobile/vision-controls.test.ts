@@ -8,92 +8,55 @@ import {
   requiresVisionModeChoice,
 } from "./vision-controls";
 
-describe("resolveVisionControls", () => {
-  it("uses the Apple runtime signal in auto mode", () => {
-    expect(resolveVisionControls("auto", true)).toBe(true);
-    expect(resolveVisionControls("auto", false)).toBe(false);
+describe("shared controls on every device", () => {
+  it("ignores old forced-on preferences and uses the same layout on Vision Pro", () => {
+    for (const preference of ["auto", "on"] as const) {
+      for (const detected of [true, false]) {
+        expect(resolveVisionControls(preference, detected)).toBe(false);
+      }
+    }
+    for (const detected of [true, false, null]) {
+      for (const saved of ["auto", "on", null] as const) {
+        expect(requiresVisionModeChoice(detected, saved)).toBe(false);
+      }
+    }
   });
-
-  it("supports a persisted fallback without misclassifying iPad", () => {
-    expect(resolveVisionControls("on", false)).toBe(true);
-    expect(resolveVisionControls("auto", false)).toBe(false);
-  });
-
-  it("never lets a preference re-enable text fields on detected Vision hardware", () => {
-    expect(resolveVisionControls("auto", true)).toBe(true);
-    expect(resolveVisionControls("on", true)).toBe(true);
-  });
-});
-
-describe("requiresVisionModeChoice", () => {
-  it("asks before mounting inputs when an older binary cannot identify the device", () => {
-    expect(requiresVisionModeChoice(null, null)).toBe(true);
-  });
-
-  it("does not ask after a choice or when the native result is known", () => {
-    expect(requiresVisionModeChoice(null, "on")).toBe(false);
-    expect(requiresVisionModeChoice(null, "auto")).toBe(false);
-    expect(requiresVisionModeChoice(true, null)).toBe(false);
-    expect(requiresVisionModeChoice(false, null)).toBe(false);
-  });
-});
-
-describe("resolveFieldPresentation", () => {
-  it.each(EDITABLE_FIELD_IDS)("%s never mounts editable text on Vision", (field) => {
-    expect(resolveFieldPresentation(field, true)).not.toBe("editable-text");
-  });
-
-  it.each(EDITABLE_FIELD_IDS)("%s remains editable off Vision", (field) => {
-    expect(resolveFieldPresentation(field, false)).toBe("editable-text");
-  });
-
-  it("keeps terminal output readonly on every platform", () => {
-    expect(resolveFieldPresentation("terminal-output", true)).toBe("readonly");
-    expect(resolveFieldPresentation("terminal-output", false)).toBe("readonly");
-  });
-});
-
-describe("resolvePaneComposerPresentation", () => {
-  it("uses voice-first controls without an input, snippets, or upload on Vision", () => {
-    expect(
-      resolvePaneComposerPresentation({
-        visionControls: true,
+  it.each(EDITABLE_FIELD_IDS)(
+    "%s stays available after removing the old Vision mode",
+    (field) => {
+      expect(resolveFieldPresentation(field, true)).toBe("editable-text");
+      expect(resolveFieldPresentation(field, false)).toBe("editable-text");
+    },
+  );
+  it("preserves uploads, shortcuts and the composer for legacy and current settings", () => {
+    for (const visionControls of [true, false]) {
+      expect(
+        resolvePaneComposerPresentation({
+          visionControls,
+          showShortcuts: true,
+          showUpload: true,
+        }),
+      ).toMatchObject({
+        mountTextInput: true,
         showShortcuts: true,
         showUpload: true,
-      }),
-    ).toEqual({
-      mountTextInput: false,
-      showShortcuts: false,
-      showUpload: false,
-      showVoice: true,
-      showKeys: true,
-      showSend: true,
-      showQuickKeys: false,
-      showMore: true,
-    });
-  });
-
-  it("preserves the standard composer", () => {
-    expect(
-      resolvePaneComposerPresentation({
-        visionControls: false,
-        showShortcuts: true,
-        showUpload: true,
-      }),
-    ).toMatchObject({
-      mountTextInput: true,
-      showShortcuts: true,
-      showUpload: true,
-      showQuickKeys: false,
-      showMore: false,
-    });
+        showMore: false,
+      });
+      expect(resolveFieldPresentation("terminal-output", visionControls)).toBe(
+        "readonly",
+      );
+    }
   });
 });
 
 describe("normalizeSpokenControllerUrl", () => {
   it("maps the default controller phrases", () => {
-    expect(normalizeSpokenControllerUrl("eng dot impo dot ai")).toBe("https://eng.xyznot.com");
-    expect(normalizeSpokenControllerUrl("production")).toBe("https://eng.xyznot.com");
+    expect(normalizeSpokenControllerUrl("eng dot impo dot ai")).toBe(
+      "https://eng.xyznot.com",
+    );
+    expect(normalizeSpokenControllerUrl("production")).toBe(
+      "https://eng.xyznot.com",
+    );
   });
 
   it("normalizes a spoken custom host", () => {

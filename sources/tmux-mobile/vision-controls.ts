@@ -17,20 +17,21 @@ export type VisionFieldId = EditableFieldId | "terminal-output";
 export type FieldPresentation = "editable-text" | "voice" | "hidden" | "readonly";
 export type VisionControlsPreference = "auto" | "on";
 
-const HIDDEN_ON_VISION = new Set<VisionFieldId>(["shortcut-item", "shortcut-new"]);
+// Compatibility exports for old saved preferences. Every device now uses the
+// standard composer with the same explicit streaming Start/Stop control.
 
 export function resolveVisionControls(
   preference: VisionControlsPreference,
   detectedOnVision: boolean,
 ): boolean {
-  return detectedOnVision || preference === "on";
+  return false;
 }
 
 export function requiresVisionModeChoice(
   nativeVisionStatus: boolean | null,
   savedPreference: VisionControlsPreference | null,
 ): boolean {
-  return nativeVisionStatus === null && savedPreference === null;
+  return false;
 }
 
 export function resolveFieldPresentation(
@@ -38,9 +39,7 @@ export function resolveFieldPresentation(
   visionControls: boolean,
 ): FieldPresentation {
   if (field === "terminal-output") return "readonly";
-  if (!visionControls) return "editable-text";
-  if (HIDDEN_ON_VISION.has(field)) return "hidden";
-  return "voice";
+  return "editable-text";
 }
 
 export function resolvePaneComposerPresentation({
@@ -53,14 +52,14 @@ export function resolvePaneComposerPresentation({
   showUpload: boolean;
 }) {
   return {
-    mountTextInput: !visionControls,
-    showShortcuts: showShortcuts && !visionControls,
-    showUpload: showUpload && !visionControls,
+    mountTextInput: true,
+    showShortcuts,
+    showUpload,
     showVoice: true,
     showKeys: true,
     showSend: true,
     showQuickKeys: false,
-    showMore: visionControls,
+    showMore: false,
   };
 }
 

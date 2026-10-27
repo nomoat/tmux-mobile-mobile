@@ -44,8 +44,8 @@ function lineOf(node: ts.Node): number {
   return appSourceFile.getLineAndCharacterOfPosition(node.getStart(appSourceFile)).line + 1;
 }
 
-describe("Vision text-input guard", () => {
-  it("keeps every editable TextInput behind the Vision-aware wrapper", () => {
+describe("Shared text input", () => {
+  it("keeps editable fields behind the shared wrapper without hiding them on Vision Pro", () => {
     const violations: string[] = [];
     let wrapperFound = false;
     let wrapperHasVisionGuard = false;
@@ -82,7 +82,7 @@ describe("Vision text-input guard", () => {
     visit(appSourceFile);
 
     expect(wrapperFound).toBe(true);
-    expect(wrapperHasVisionGuard).toBe(true);
+    expect(wrapperHasVisionGuard).toBe(false);
     expect(violations).toEqual([]);
   });
 });
@@ -165,13 +165,13 @@ describe("Terminal fullscreen behavior", () => {
 });
 
 describe("Voice input device presentation", () => {
-  it("keeps the dedicated voice row exclusive to Vision controls", () => {
-    expect(appSource).not.toContain("standardVoiceControl");
-    expect(appSource).not.toContain('title: "Voice input"');
-    expect(appSource).toContain("if (visionControls) {");
-    expect(appSource).toContain("style={styles.visionComposerPrimaryRow}");
-    expect(appSource).toContain(
-      'accessibilityLabel={recognizing ? "Stop voice input" : "Start voice input"}',
-    );
+  it("has one shared streaming toggle and no separate Vision chooser or giant voice row", () => {
+    expect(appSource).not.toContain("function VisionModeGate(");
+    expect(appSource).not.toContain("visionControlsPreference=");
+    expect(appSource).not.toContain("style={styles.visionComposerPrimaryRow}");
+    expect(appSource).not.toContain("{voiceButton}");
+    expect(appSource).toContain("{streamingButton}");
+    expect(appSource).toContain("streamingMode={streamingInput.mode}");
+    expect(appSource).toContain("streamingMode={terminalStreamingInput.mode}");
   });
 });
