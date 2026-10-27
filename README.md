@@ -111,6 +111,12 @@ while speaking. Stop finalizes the transcript; Send remains separate. Existing
 text is preserved, other editing controls lock during capture, and session changes,
 backgrounding or closing cancel recording. The old complete-recording microphone button is hidden. Start/Cancel/Stop/Wait labels match Web. Stop closes the microphone before final text arrives. Vision Pro uses the same compact toggle and standard fields; the old mode chooser and settings entry are removed, and saved mode preferences no longer change the layout.
 
+iOS and Android keep the screen awake while connecting and recording in either
+composer. Stop, Cancel, errors, session changes, backgrounding and closing restore
+normal auto-lock. Each capture owns a separate lock; cancellation during native
+activation releases it once activation settles. This uses Expo KeepAwake already
+included by Expo in both runtime binaries, with no native dependency changes.
+
 Use the existing Expo AudioStream when the binary exposes it. Older binaries
 stream new bytes from one AAC ADTS/WAV recording through the Controller decoder.
 No native dependency changes are needed. Ship runtime 7 iOS/Android and runtime 6
