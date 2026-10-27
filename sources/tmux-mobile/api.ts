@@ -3,7 +3,7 @@ import type { AgentSession } from "./types";
 import { migrateControllerOrigin } from "./controller-origin";
 import Constants from "expo-constants";
 import { createFullResponseLoader } from "./full-response";
-import { EncodingType, getInfoAsync, readAsStringAsync } from "expo-file-system/legacy";
+import { EncodingType, FileSystemUploadType, getInfoAsync, readAsStringAsync, uploadAsync } from "expo-file-system/legacy";
 import { toByteArray } from "base64-js";
 import type {
   AgentFileResponse,
@@ -28,8 +28,17 @@ export interface UploadFileInput {
 }
 
 export interface UploadFileResponse {
+  url?: string;
+  expiresAt?: string;
+  size?: number;
   path?: string;
   name?: string;
+}
+
+interface DirectUploadPlan {
+  upload: { url: string; method: "PUT"; headers: Record<string, string> };
+  ticket: string;
+  uploadExpiresAt: string;
 }
 
 export interface TranscribeAudioResponse {
@@ -392,18 +401,38 @@ export class TmuxMobileApi {
   ): Promise<UploadFileResponse> {
     const info = await getInfoAsync(file.uri);
     if (!info.exists) throw new Error("The selected file is no longer available. Please select it again.");
-    const base64 = await readAsStringAsync(file.uri, { encoding: EncodingType.Base64 });
-    const params = new URLSearchParams({
-      paneId,
-      name: file.name || "upload",
+    let plan: DirectUploadPlan;
+    try {
+      plan = await this.request<DirectUploadPlan>("/api/uploads", {
+        method: "POST",
+        body: { name: file.name || "upload", size: info.size, contentType: file.type || "application/octet-stream" },
+      });
+    } catch (error) {
+      if (!(error instanceof ApiError) || ![404, 501].includes(error.status)) throw error;
+      // Local-only or older Controllers: still stream natively, never base64.
+      const headers: Record<string, string> = { "content-type": file.type || "application/octet-stream" };
+      if (this.token) headers.authorization = `Bearer ${this.token}`;
+      if (machineId && machineId !== "local") headers["x-machine-id"] = machineId;
+      const params = new URLSearchParams({ paneId, name: file.name || "upload" });
+      const result = await uploadAsync(this.url(`/api/upload?${params}`).toString(), file.uri, {
+        httpMethod: "POST", uploadType: FileSystemUploadType.BINARY_CONTENT, headers,
+      });
+      const body = JSON.parse(result.body || "{}");
+      if (result.status < 200 || result.status >= 300) throw new ApiError(body.error || "File upload failed", result.status);
+      return body;
+    }
+    // Native URLSession/OkHttp reads the file from disk. Only the signed upload
+    // headers go to S3; the Controller bearer token never leaves this API.
+    const result = await uploadAsync(plan.upload.url, file.uri, {
+      httpMethod: plan.upload.method, uploadType: FileSystemUploadType.BINARY_CONTENT,
+      headers: plan.upload.headers,
     });
-    return this.request<UploadFileResponse>(`/api/upload?${params.toString()}`, {
-      method: "POST",
-      machineId,
-      headers: {
-        "content-type": file.type || "application/octet-stream",
-      },
-      body: base64ToArrayBuffer(base64),
+    if (result.status < 200 || result.status >= 300) throw new ApiError(
+      result.status === 403 ? "Upload authorization expired or was rejected. Select the file again." : "File upload failed. Please try again.",
+      result.status,
+    );
+    return this.request<UploadFileResponse>("/api/uploads/complete", {
+      method: "POST", body: { ticket: plan.ticket },
     });
   }
 
