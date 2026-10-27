@@ -136,3 +136,16 @@ that expires two hours after upload. Neither the Controller nor the Connector
 relays file bytes. The old upload endpoint is retained only for local/older
 Controllers; native fallback also avoids Base64 buffering. No native dependency
 change is needed: ship runtime 7 iOS/Android and the runtime 6 Android backport.
+
+## Live dictation (2026-10-27)
+
+The waveform button in Send and Terminal composers uses Free ASR to show words
+while speaking. Stop finalizes the transcript; Send remains separate. Existing
+text is preserved, other editing controls lock during capture, and session changes,
+backgrounding or closing cancel recording. The regular microphone stays available.
+
+Use the existing Expo AudioStream when the binary exposes it. Older binaries
+stream new bytes from one AAC ADTS/WAV recording through the Controller decoder.
+No native dependency changes are needed. Ship runtime 7 iOS/Android and runtime 6
+Android independently. `streaming-asr-session.js` matches the Web source at
+`tmux-mobile/public/streaming-asr-session.js`; keep both copies synchronized.
