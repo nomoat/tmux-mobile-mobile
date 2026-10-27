@@ -109,7 +109,7 @@ change is needed: ship runtime 7 iOS/Android and the runtime 6 Android backport.
 The waveform button in Send and Terminal composers uses Free ASR to show words
 while speaking. Stop finalizes the transcript; Send remains separate. Existing
 text is preserved, other editing controls lock during capture, and session changes,
-backgrounding or closing cancel recording. The regular microphone stays available.
+backgrounding or closing cancel recording. The old complete-recording microphone button is hidden. Start/Cancel/Stop/Wait labels match Web. Stop closes the microphone before final text arrives. Vision Pro uses the same compact toggle and standard fields; the old mode chooser and settings entry are removed, and saved mode preferences no longer change the layout.
 
 Use the existing Expo AudioStream when the binary exposes it. Older binaries
 stream new bytes from one AAC ADTS/WAV recording through the Controller decoder.

@@ -20,6 +20,7 @@ import {
   createStreamingAsrSession,
   dictationText,
   type StreamingAsrSession,
+  type StreamingDictationMode,
 } from "./streaming-asr-session";
 
 const NativeWebSocket = WebSocket as unknown as {
@@ -93,9 +94,7 @@ export function useStreamingDictation({
   onChangeText: (text: string) => void;
   onStatus: (status: string) => void;
 }) {
-  const [mode, setMode] = React.useState<
-    "idle" | "connecting" | "recording" | "finishing"
-  >("idle");
+  const [mode, setMode] = React.useState<StreamingDictationMode>("idle");
   const current = React.useRef<Capture | null>(null),
     pendingCleanup = React.useRef<Promise<void>>(Promise.resolve());
   const latest = React.useRef({ api, scopeKey, value, onChangeText, onStatus });
@@ -163,10 +162,18 @@ export function useStreamingDictation({
   const toggle = React.useCallback(async () => {
     const active = current.current;
     if (active) {
+      if (mode === "connecting") {
+        cancel();
+        setMode("idle");
+        latest.current.onStatus(
+          "Live dictation stopped. Your current text was kept.",
+        );
+        return;
+      }
       if (active.stopping || mode !== "recording") return;
       active.stopping = true;
       setMode("finishing");
-      latest.current.onStatus("Finishing live dictation…");
+      latest.current.onStatus("Microphone off · Finishing transcription…");
       try {
         await cleanup(active, true);
         if (!active.cancelled) active.session?.finish();
@@ -325,7 +332,7 @@ export function useStreamingDictation({
           }, 150);
         }
         setMode("recording");
-        latest.current.onStatus("Listening · Free ASR");
+        latest.current.onStatus("Listening · Tap Stop to finish");
       } catch (error) {
         if (valid()) {
           cancel();
@@ -340,6 +347,7 @@ export function useStreamingDictation({
     if (!valid()) void cleanup(state);
   }, [cancel, cleanup, mode]);
   return {
+    mode,
     active: mode !== "idle",
     busy: mode === "connecting" || mode === "finishing",
     toggle,

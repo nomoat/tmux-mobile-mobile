@@ -1,3 +1,4 @@
+import { streamingDictationControl, type StreamingDictationMode } from "@/tmux-mobile/streaming-asr-session";
 import { useStreamingDictation } from "@/tmux-mobile/use-streaming-dictation";
 import { CardActionBar, CardActionIcon } from "@/tmux-mobile/card-action-bar";
 import { TextSelectionSurface, TextSelectionModal, type TextSelectionTarget } from "@/tmux-mobile/text-selection";
@@ -232,9 +233,6 @@ import {
   resolveFieldPresentation,
   resolvePaneComposerPresentation,
   resolveVisionControls,
-  requiresVisionModeChoice,
-  VISION_CONTROLS_PREFERENCE_KEY,
-  type VisionControlsPreference,
   type VisionFieldId,
 } from "@/tmux-mobile/vision-controls";
 import type {
@@ -821,10 +819,6 @@ function CommandCenterScreen() {
   const themeWrite = React.useRef(Promise.resolve());
   const [fontScaleLevel, setFontScaleLevel] = React.useState<FontScaleLevel>("standard");
   const [fontScaleLoaded, setFontScaleLoaded] = React.useState(false);
-  const [visionControlsPreference, setVisionControlsPreference] =
-    React.useState<VisionControlsPreference>("auto");
-  const [visionControlsPreferenceLoaded, setVisionControlsPreferenceLoaded] = React.useState(false);
-  const [visionModeChoiceRequired, setVisionModeChoiceRequired] = React.useState(false);
   const [machineFilter, setMachineFilter] = React.useState("all");
   const [sendTarget, setSendTarget] = React.useState<AgentSession | null>(null);
   const [renameTarget, setRenameTarget] = React.useState<AgentSession | null>(null);
@@ -903,13 +897,13 @@ function CommandCenterScreen() {
   const relativeTimeNow = Date.now();
   const otaUpdates = useOtaUpdates();
   const visionControlsEnabled = resolveVisionControls(
-    visionControlsPreference,
+    "auto",
     NATIVE_VISION_CONTROLS_DETECTED,
   );
   const embeddedSshAvailable =
     Platform.OS === "ios" &&
     hasNativeCJMUXBlinkTerminal &&
-    !visionControlsEnabled;
+    !NATIVE_VISION_CONTROLS_DETECTED;
 
   React.useEffect(() => {
     let mounted = true;
@@ -937,43 +931,6 @@ function CommandCenterScreen() {
       mounted = false;
     };
   }, []);
-
-  React.useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      let storedPreference: VisionControlsPreference | null = null;
-      try {
-        const value = await AsyncStorage.getItem(VISION_CONTROLS_PREFERENCE_KEY);
-        if (value === "auto" || value === "on") storedPreference = value;
-      } catch {
-        // Treat an unreadable preference as no choice so older binaries fail closed.
-      }
-      if (!mounted) return;
-      if (storedPreference) setVisionControlsPreference(storedPreference);
-      setVisionModeChoiceRequired(
-        requiresVisionModeChoice(NATIVE_VISION_CONTROLS_STATUS, storedPreference),
-      );
-      setVisionControlsPreferenceLoaded(true);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  React.useEffect(() => {
-    if (visionControlsEnabled) Keyboard.dismiss();
-  }, [visionControlsEnabled]);
-
-  const updateVisionControlsPreference = React.useCallback(
-    (next: VisionControlsPreference) => {
-      setVisionControlsPreference(next);
-      setVisionModeChoiceRequired(false);
-      AsyncStorage.setItem(VISION_CONTROLS_PREFERENCE_KEY, next).catch(() => {});
-      Keyboard.dismiss();
-      void Haptics.selectionAsync();
-    },
-    [],
-  );
 
   const updateFontScaleLevel = React.useCallback((next: FontScaleLevel) => {
     setFontScaleLevel(next);
@@ -1612,7 +1569,7 @@ function CommandCenterScreen() {
   );
 
   const ipadShortcutEnabled =
-    Platform.OS === "ios" && Platform.isPad && !visionControlsEnabled;
+    Platform.OS === "ios" && Platform.isPad && !NATIVE_VISION_CONTROLS_DETECTED;
   const ipadShortcutMode: CJMUXKeyboardShortcutMode = !ipadShortcutEnabled
     ? "none"
     : sshTarget
@@ -1685,20 +1642,11 @@ function CommandCenterScreen() {
     [fontScale, styles, theme, visionControlsEnabled],
   );
 
-  if (auth.loading || !fontScaleLoaded || !visionControlsPreferenceLoaded) {
+  if (auth.loading || !fontScaleLoaded) {
     return withTheme(
       <View style={[styles.center, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator color={theme.colors.accent} />
       </View>,
-    );
-  }
-
-  if (visionModeChoiceRequired) {
-    return withTheme(
-      <VisionModeGate
-        onChooseVision={() => updateVisionControlsPreference("on")}
-        onChooseStandard={() => updateVisionControlsPreference("auto")}
-      />,
     );
   }
 
@@ -2046,9 +1994,6 @@ function CommandCenterScreen() {
         ota={otaUpdates}
         fontScaleLevel={fontScaleLevel}
         onFontScaleLevelChange={updateFontScaleLevel}
-        visionControlsPreference={visionControlsPreference}
-        visionDetected={NATIVE_VISION_CONTROLS_DETECTED}
-        onVisionControlsPreferenceChange={updateVisionControlsPreference}
         onClose={() => setSettingsVisible(false)}
       />
       <CommandMenu
@@ -2171,62 +2116,6 @@ function LoginScreen() {
         {auth.error ? <Text style={styles.errorText}>{auth.error}</Text> : null}
       </View>
     </KeyboardAvoidingView>
-  );
-}
-
-function VisionModeGate({
-  onChooseVision,
-  onChooseStandard,
-}: {
-  onChooseVision: () => void;
-  onChooseStandard: () => void;
-}) {
-  const theme = useAppTheme();
-  const styles = useAppStyles();
-  const insets = useSafeAreaInsets();
-
-  return (
-    <View
-      style={[
-        styles.loginScreen,
-        {
-          paddingTop: insets.top + 24,
-          paddingBottom: insets.bottom + 24,
-        },
-      ]}
-    >
-      <View style={styles.loginPanel}>
-        <Image source={APP_LOGO} style={styles.loginLogo} resizeMode="contain" />
-        <Text style={styles.loginTitle}>Choose controls</Text>
-        <Text style={styles.loginText}>
-          Are you using Apple Vision Pro? Choose before AMUX shows any text field.
-        </Text>
-        <View style={styles.visionModeActions}>
-          <Pressable
-            accessibilityLabel="Use Vision Pro voice-only controls"
-            style={[styles.visionModeChoiceButton, styles.visionModeChoiceButtonPrimary]}
-            onPress={onChooseVision}
-          >
-            <Mic size={26} color={theme.colors.surfaceRaised} />
-            <View style={styles.visionModeChoiceTextBlock}>
-              <Text style={styles.visionModeChoicePrimaryText}>Vision Pro</Text>
-              <Text style={styles.visionModeChoicePrimaryMeta}>Voice only · no keyboard</Text>
-            </View>
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Use standard iPhone or iPad controls"
-            style={styles.visionModeChoiceButton}
-            onPress={onChooseStandard}
-          >
-            <Smartphone size={26} color={theme.colors.text} />
-            <View style={styles.visionModeChoiceTextBlock}>
-              <Text style={styles.visionModeChoiceText}>iPhone or iPad</Text>
-              <Text style={styles.visionModeChoiceMeta}>Standard text controls</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -3327,18 +3216,12 @@ function SettingsModal({
   ota,
   fontScaleLevel,
   onFontScaleLevelChange,
-  visionControlsPreference,
-  visionDetected,
-  onVisionControlsPreferenceChange,
   onClose,
 }: {
   visible: boolean;
   ota: OtaUpdateController;
   fontScaleLevel: FontScaleLevel;
   onFontScaleLevelChange: (value: FontScaleLevel) => void;
-  visionControlsPreference: VisionControlsPreference;
-  visionDetected: boolean;
-  onVisionControlsPreferenceChange: (value: VisionControlsPreference) => void;
   onClose: () => void;
 }) {
   const theme = useAppTheme();
@@ -3451,48 +3334,7 @@ function SettingsModal({
         </View>
       ) : null}
 
-      <View style={styles.settingsSection}>
-        <View style={styles.settingsSectionHeader}>
-          <Eye size={16} color={theme.colors.textMuted} />
-          <Text style={styles.settingsSectionTitle}>Vision controls</Text>
-        </View>
-        <Text style={styles.settingsSectionDescription}>
-          {visionDetected
-            ? "Apple Vision Pro detected. Text fields are replaced with voice controls."
-            : "Auto uses Apple’s Vision runtime signal. Use On as a fallback on older visionOS versions or to preview this layout."}
-        </Text>
-        <View style={styles.visionPreferenceRow}>
-          {(
-            [
-              ["auto", "Auto"],
-              ["on", "On"],
-            ] as const
-          ).map(([value, label]) => {
-            const active = visionControlsPreference === value;
-            return (
-              <Pressable
-                key={value}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: active }}
-                style={[
-                  styles.visionPreferenceButton,
-                  active ? styles.visionPreferenceButtonActive : null,
-                ]}
-                onPress={() => onVisionControlsPreferenceChange(value)}
-              >
-                <Text
-                  style={[
-                    styles.visionPreferenceButtonText,
-                    active ? styles.visionPreferenceButtonTextActive : null,
-                  ]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+
 
       <View style={styles.settingsSection}>
         <View style={styles.settingsSectionHeader}>
@@ -3997,7 +3839,6 @@ function useLocalVoiceInput({
 }
 
 function KeyboardTextInput(props: TextInputProps) {
-  if (useVisionControls()) return null;
   return <TextInput {...props} />;
 }
 
@@ -4161,7 +4002,7 @@ function PaneComposer({
   onToggleVoice,
   onToggleStreaming,
   streamingActive = false,
-  streamingBusy = false,
+  streamingMode = "idle",
   onOpenKeys,
   onQuickKey,
   onOpenUpload,
@@ -4197,7 +4038,7 @@ function PaneComposer({
   onToggleVoice: () => void;
   onToggleStreaming?: () => void;
   streamingActive?: boolean;
-  streamingBusy?: boolean;
+  streamingMode?: StreamingDictationMode;
   onOpenKeys: () => void;
   onQuickKey?: (entry: TerminalKeyEntry) => void;
   onOpenUpload?: () => void;
@@ -4240,9 +4081,6 @@ function PaneComposer({
   const standardActionDisabled = controlDisabled || standardVoiceActive;
   const standardSendIsDisabled = sendIsDisabled || standardVoiceActive;
   const standardStatus = (standardVoiceRecording || voiceTranscribing) ? "" : status;
-  const visionSendIsDisabled = streamingActive || (value.trim()
-    ? sendIsDisabled
-    : disabled || sendBusy || keyBusy || !onQuickKey);
   const iconColor = controlDisabled ? theme.colors.textMuted : theme.colors.text;
   const activeIconColor = theme.colors.accent;
   const showClear = expanded && Boolean(onClear);
@@ -4257,7 +4095,6 @@ function PaneComposer({
   const [snippetSheetVisible, setSnippetSheetVisible] = React.useState(false);
   const [snippetDraftItems, setSnippetDraftItems] = React.useState<UserSnippetItem[]>([]);
   const [snippetNewText, setSnippetNewText] = React.useState("");
-  const [visionMoreVisible, setVisionMoreVisible] = React.useState(false);
   const [singleShellPromptsExpanded, setSingleShellPromptsExpanded] = React.useState(false);
   const singleShellPromptsVisible = usesSingleShell && singleShellPromptsExpanded;
   const singleShellExpandedHeight = Math.max(180, Math.round(viewportHeight * 0.5));
@@ -4267,10 +4104,6 @@ function PaneComposer({
       loaded.length > 0 ? loaded : FALLBACK_SNIPPETS,
     );
   }, [snippets.data?.items]);
-
-  React.useEffect(() => {
-    if (!visionControls) setVisionMoreVisible(false);
-  }, [visionControls]);
 
   React.useEffect(() => {
     if (!usesSingleShell || disabled) setSingleShellPromptsExpanded(false);
@@ -4301,44 +4134,29 @@ function PaneComposer({
     setSnippetNewText("");
   }, [resetSnippets]);
 
-  const voiceButton = (
-    <Pressable
-      accessibilityLabel={recognizing ? "Stop voice input" : "Start voice input"}
-      style={[
-        expanded ? styles.paneComposerInlineButton : styles.paneComposerIconButton,
-        recognizing ? (expanded ? styles.paneComposerInlineButtonActive : styles.paneComposerIconButtonActive) : null,
-        controlDisabled || streamingActive ? styles.disabledButton : null,
-      ]}
-      disabled={controlDisabled || streamingActive}
-      onPress={onToggleVoice}
-    >
-      {recognizing ? (
-        expanded ? (
-          <MicOff size={16} color={activeIconColor} />
-        ) : (
-          <VoiceWaveform />
-        )
-      ) : (
-        <Mic size={16} color={iconColor} />
-      )}
-    </Pressable>
-  );
-
+  const streamingControl = streamingDictationControl(streamingMode);
+  const streamingDisabled = controlDisabled || recognizing || streamingControl.disabled;
+  const streamingColor = streamingMode === "recording" ? "#fff" : iconColor;
   const streamingButton = onToggleStreaming ? (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={streamingActive ? "Stop live dictation" : "Live dictation (Free ASR)"}
-      accessibilityHint="Show words as you speak. Stop to finish; Send is separate."
-      accessibilityState={{ selected: streamingActive, disabled: controlDisabled || recognizing || streamingBusy }}
+      accessibilityLabel={streamingControl.hint}
+      accessibilityHint="Tap once to start. Tap Stop to turn off the microphone; Send is separate."
+      accessibilityState={{ selected: streamingMode === "recording", disabled: streamingDisabled }}
       style={[
         expanded ? styles.paneComposerInlineButton : styles.paneComposerIconButton,
-        streamingActive ? styles.paneComposerInlineButtonActive : null,
-        controlDisabled || recognizing || streamingBusy ? styles.disabledButton : null,
+        styles.streamingDictationButton,
+        streamingMode === "recording" ? styles.streamingDictationRecording : null,
+        streamingDisabled ? styles.disabledButton : null,
       ]}
-      disabled={controlDisabled || recognizing || streamingBusy}
+      disabled={streamingDisabled}
       onPress={onToggleStreaming}
     >
-      {streamingBusy ? <ActivityIndicator size="small" color={theme.colors.text} /> : <AudioLines size={18} color={streamingActive ? activeIconColor : iconColor} />}
+      {streamingControl.icon === "spinner" ? <ActivityIndicator size="small" color={streamingColor} />
+        : streamingControl.icon === "stop" ? <Square size={14} color={streamingColor} fill={streamingColor} />
+        : streamingControl.icon === "cancel" ? <X size={16} color={streamingColor} />
+        : <AudioLines size={16} color={streamingColor} />}
+      <Text style={[styles.streamingDictationLabel, { color: streamingColor }]}>{streamingControl.label}</Text>
     </Pressable>
   ) : null;
 
@@ -4537,184 +4355,6 @@ function PaneComposer({
     </Pressable>
   ) : null;
 
-  if (visionControls) {
-    return (
-      <View style={[styles.paneComposer, styles.visionPaneComposer]}>
-        <View style={styles.visionDraftPreview}>
-          <Text
-            selectable
-            style={[
-              styles.visionDraftPreviewText,
-              !value ? styles.visionVoiceValuePlaceholder : null,
-            ]}
-          >
-            {value || "Tap Speak, then use Send when the transcription is ready."}
-          </Text>
-        </View>
-        <View style={styles.visionComposerPrimaryRow}>
-          {streamingButton}
-          <Pressable
-            accessibilityLabel={recognizing ? "Stop voice input" : "Start voice input"}
-            style={[
-              styles.visionComposerVoiceButton,
-              recognizing ? styles.visionVoiceButtonActive : null,
-              controlDisabled || streamingActive ? styles.disabledButton : null,
-            ]}
-            disabled={controlDisabled || streamingActive}
-            onPress={onToggleVoice}
-          >
-            {recognizing ? (
-              <VoiceWaveform prominent />
-            ) : (
-              <Mic size={22} color={iconColor} />
-            )}
-            <Text
-              style={[
-                styles.visionComposerButtonText,
-                recognizing ? styles.visionVoiceButtonTextActive : null,
-              ]}
-            >
-              {recognizing ? "Stop" : "Speak"}
-            </Text>
-          </Pressable>
-          {onClear ? (
-            <Pressable
-              accessibilityLabel="Clear voice draft"
-              style={[
-                styles.visionComposerSquareButton,
-                !value || controlDisabled || streamingActive ? styles.disabledButton : null,
-              ]}
-              disabled={!value || controlDisabled || streamingActive}
-              onPress={() => {
-                onClear();
-                void Haptics.selectionAsync();
-              }}
-            >
-              <X size={21} color={!value || controlDisabled ? theme.colors.textMuted : theme.colors.text} />
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityLabel="Send voice input"
-            style={[
-              styles.visionComposerSendButton,
-              visionSendIsDisabled ? styles.disabledButton : null,
-            ]}
-            disabled={visionSendIsDisabled}
-            onPress={() => {
-              if (value.trim()) {
-                onSend();
-                return;
-              }
-              onQuickKey?.(VISION_QUICK_KEYS[0]);
-            }}
-          >
-            {sendBusy || keyBusy ? (
-              <ActivityIndicator color={theme.colors.surfaceRaised} />
-            ) : (
-              <Send size={21} color={theme.colors.surfaceRaised} />
-            )}
-            <Text style={styles.visionComposerSendText}>
-              {value.trim() ? "Send" : "Enter"}
-            </Text>
-          </Pressable>
-          {presentation.showMore ? (
-            <Pressable
-              accessibilityLabel={visionMoreVisible ? "Hide more controls" : "Show more controls"}
-              accessibilityState={{ expanded: visionMoreVisible }}
-              style={[
-                styles.visionComposerMoreButton,
-                visionMoreVisible ? styles.paneComposerInlineButtonActive : null,
-              ]}
-              onPress={() => setVisionMoreVisible((current) => !current)}
-            >
-              <MoreVertical
-                size={20}
-                color={visionMoreVisible ? activeIconColor : theme.colors.text}
-              />
-              <Text
-                style={[
-                  styles.visionComposerMoreButtonText,
-                  visionMoreVisible ? styles.paneComposerToolButtonTextActive : null,
-                ]}
-              >
-                {visionMoreVisible ? "Less" : "More"}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-        {visionMoreVisible ? (
-          <View style={styles.visionMorePanel}>
-            {presentation.showQuickKeys || visionMoreVisible ? (
-              <View style={styles.visionQuickKeyGrid}>
-                {VISION_QUICK_KEYS.map((entry) => (
-                  <Pressable
-                    key={entry.label}
-                    accessibilityLabel={`Send ${entry.label} terminal key`}
-                    style={[
-                      styles.visionQuickKeyButton,
-                      entry.danger ? styles.keyButtonDanger : null,
-                      controlDisabled || !onQuickKey ? styles.disabledButton : null,
-                    ]}
-                    disabled={controlDisabled || !onQuickKey}
-                    onPress={() => {
-                      onQuickKey?.(entry);
-                      void Haptics.selectionAsync();
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.visionQuickKeyText,
-                        entry.danger ? styles.keyButtonTextDanger : null,
-                      ]}
-                    >
-                      {entry.label}
-                    </Text>
-                  </Pressable>
-                ))}
-                <Pressable
-                  accessibilityLabel="Open all terminal keys"
-                  style={[
-                    styles.visionQuickKeyButton,
-                    controlDisabled || streamingActive ? styles.disabledButton : null,
-                  ]}
-                  disabled={controlDisabled || streamingActive}
-                  onPress={onOpenKeys}
-                >
-                  <Terminal size={19} color={iconColor} />
-                  <Text style={styles.visionQuickKeyText}>All keys</Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-        {reserveStatusSpace || status || error ? (
-          <Text style={styles.paneComposerStatus} numberOfLines={2}>
-            {status || error || ""}
-          </Text>
-        ) : null}
-        {error ? (
-          <View style={styles.retryRow}>
-            <Text style={styles.retryErrorText} numberOfLines={2}>
-              {error}
-            </Text>
-            <Pressable
-              style={[
-                styles.retryButton,
-                styles.visionRetryButton,
-                retryDisabled || streamingActive ? styles.disabledButton : null,
-              ]}
-              disabled={retryDisabled || streamingActive}
-              onPress={onRetry}
-            >
-              <RefreshCcw size={18} color={theme.colors.surfaceRaised} />
-              <Text style={styles.retryButtonText}>{retryLabel}</Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.paneComposer, usesSingleShell ? styles.paneComposerSingleShell : null]}>
       {!usesSingleShell ? shortcutsBar : null}
@@ -4748,7 +4388,6 @@ function PaneComposer({
               {keysButton}
               {promptToggleButton}
               {clearButton}
-              {voiceButton}
               {streamingButton}
               {sendButton}
             </View>
@@ -4776,7 +4415,6 @@ function PaneComposer({
         </>
       ) : (
         <View style={styles.paneComposerCompactRow}>
-          {voiceButton}
           {streamingButton}
           {keysButton}
           {input}
@@ -5132,7 +4770,7 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
         onRetry={retrySend}
         onToggleStreaming={() => { void streamingInput.toggle(); }}
         streamingActive={streamingInput.active}
-        streamingBusy={streamingInput.busy}
+        streamingMode={streamingInput.mode}
         recognizing={voiceInput.active}
         voiceRecording={voiceInput.recording}
         voiceTranscribing={voiceInput.transcribing}
@@ -6838,7 +6476,7 @@ function WindowViewModal({
         onRetry={() => sendTerminalInput({ submit: true })}
         onToggleStreaming={() => { void terminalStreamingInput.toggle(); }}
         streamingActive={terminalStreamingInput.active}
-        streamingBusy={terminalStreamingInput.busy}
+        streamingMode={terminalStreamingInput.mode}
         recognizing={terminalVoiceInput.active}
         voiceRecording={terminalVoiceInput.recording}
         voiceTranscribing={terminalVoiceInput.transcribing}
@@ -10423,6 +10061,18 @@ function createStyles(
     backgroundColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
+  },
+  streamingDictationButton: {
+    width: 76,
+    flexDirection: "row",
+    gap: 4,
+  },
+  streamingDictationRecording: {
+    backgroundColor: "#b3261e",
+  },
+  streamingDictationLabel: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   paneComposerInlineButtonActive: {
     borderColor: theme.colors.accent,
