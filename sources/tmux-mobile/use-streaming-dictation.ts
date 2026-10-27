@@ -14,6 +14,7 @@ import {
   EncodingType,
 } from "expo-file-system/legacy";
 import { toByteArray } from "base64-js";
+import { holdDictationScreenAwake } from "./dictation-screen-awake";
 import type { TmuxMobileApi } from "./api";
 import {
   createPcmResampler,
@@ -45,6 +46,7 @@ type NativeStream = {
   ): { remove(): void };
 };
 type Capture = {
+  screenAwake?: ReturnType<typeof holdDictationScreenAwake>;
   session?: StreamingAsrSession;
   stream?: NativeStream;
   recorder?: AudioRecorder;
@@ -102,6 +104,9 @@ export function useStreamingDictation({
   const cleanup = React.useCallback((state: Capture, drain = false) => {
     if (state.cleanup) return state.cleanup;
     clearInterval(state.timer);
+    // Release immediately on Stop/Cancel, not after a permission dialog, socket
+    // handshake or final transcript finishes. The lease handles pending activation.
+    const screenReleased = state.screenAwake?.release();
     state.cleanup = (async () => {
       // A cancelled permission/start request may still be completing.
       await state.setup;
@@ -131,6 +136,7 @@ export function useStreamingDictation({
       if (state.uri)
         await deleteAsync(state.uri, { idempotent: true }).catch(() => {});
       await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+      await screenReleased;
     })();
     pendingCleanup.current = state.cleanup;
     return state.cleanup;
@@ -212,6 +218,11 @@ export function useStreamingDictation({
       try {
         await pendingCleanup.current;
         if (!valid()) return;
+        if (Platform.OS === "ios" || Platform.OS === "android") {
+          state.screenAwake = holdDictationScreenAwake();
+          await state.screenAwake.ready;
+          if (!valid()) return;
+        }
         const permission = await requestRecordingPermissionsAsync();
         if (!valid()) return;
         if (!permission.granted)
