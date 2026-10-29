@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { NATIVE_VISION_CONTROLS_DETECTED } from './vision-device';
 import { FpsModal as Modal } from './fps-monitor';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -68,6 +69,7 @@ export function DraftsModal({ api, initialPath, theme, onClose, page = 'drafts' 
           <WebView
             ref={browser}
             source={source}
+            applicationNameForUserAgent={NATIVE_VISION_CONTROLS_DETECTED ? "TMaxVision/1" : undefined}
             style={[styles.screen, { backgroundColor: theme.colors.background }]}
             originWhitelist={["*"]}
             onShouldStartLoadWithRequest={request => {

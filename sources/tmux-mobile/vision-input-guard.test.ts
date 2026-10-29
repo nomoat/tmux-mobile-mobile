@@ -45,7 +45,7 @@ function lineOf(node: ts.Node): number {
 }
 
 describe("Shared text input", () => {
-  it("keeps editable fields behind the shared wrapper without hiding them on Vision Pro", () => {
+  it("keeps editable fields behind the shared wrapper without mounting them on Vision Pro", () => {
     const violations: string[] = [];
     let wrapperFound = false;
     let wrapperHasVisionGuard = false;
@@ -60,7 +60,7 @@ describe("Shared text input", () => {
               ts.isIfStatement(statement) &&
               statement.expression.getText(appSourceFile) === "useVisionControls()" &&
               ts.isReturnStatement(statement.thenStatement) &&
-              statement.thenStatement.expression?.kind === ts.SyntaxKind.NullKeyword,
+              statement.thenStatement.expression?.getText(appSourceFile).includes("VisionTextField"),
           );
       }
 
@@ -82,7 +82,7 @@ describe("Shared text input", () => {
     visit(appSourceFile);
 
     expect(wrapperFound).toBe(true);
-    expect(wrapperHasVisionGuard).toBe(false);
+    expect(wrapperHasVisionGuard).toBe(true);
     expect(violations).toEqual([]);
   });
 });
