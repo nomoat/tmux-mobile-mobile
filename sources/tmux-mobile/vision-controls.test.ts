@@ -8,11 +8,11 @@ import {
   requiresVisionModeChoice,
 } from "./vision-controls";
 
-describe("shared controls on every device", () => {
-  it("ignores old forced-on preferences and uses the same layout on Vision Pro", () => {
+describe("automatic Vision controls", () => {
+  it("detects Vision Pro automatically and ignores forced-on preferences elsewhere", () => {
     for (const preference of ["auto", "on"] as const) {
       for (const detected of [true, false]) {
-        expect(resolveVisionControls(preference, detected)).toBe(false);
+        expect(resolveVisionControls(preference, detected)).toBe(detected);
       }
     }
     for (const detected of [true, false, null]) {
@@ -22,9 +22,9 @@ describe("shared controls on every device", () => {
     }
   });
   it.each(EDITABLE_FIELD_IDS)(
-    "%s stays available after removing the old Vision mode",
+    "%s uses voice buttons on Vision Pro",
     (field) => {
-      expect(resolveFieldPresentation(field, true)).toBe("editable-text");
+      expect(resolveFieldPresentation(field, true)).toBe("voice");
       expect(resolveFieldPresentation(field, false)).toBe("editable-text");
     },
   );
@@ -37,7 +37,7 @@ describe("shared controls on every device", () => {
           showUpload: true,
         }),
       ).toMatchObject({
-        mountTextInput: true,
+        mountTextInput: !visionControls,
         showShortcuts: true,
         showUpload: true,
         showMore: false,

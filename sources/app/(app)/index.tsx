@@ -54,7 +54,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Markdown, { type RenderRules } from "react-native-markdown-display";
 import { MermaidBlock } from "@/tmux-mobile/mermaid-block";
 import { toByteArray } from "base64-js";
-import CJMUXVisionDevice from "../../../modules/cjmux-vision-device";
+import { NATIVE_VISION_CONTROLS_STATUS, NATIVE_VISION_CONTROLS_DETECTED } from "@/tmux-mobile/vision-device";
 import {
   CJMUXBlinkTerminal,
   hasNativeCJMUXBlinkTerminal,
@@ -263,13 +263,6 @@ const CONTROLLER_BROWSER_HANDOFF_PATHS = new Set([
   "/api/file-page",
   "/api/file-raw",
 ]);
-const NATIVE_VISION_CONTROLS_STATUS: boolean | null =
-  Platform.OS !== "ios"
-    ? false
-    : Platform.isVision
-      ? true
-      : CJMUXVisionDevice.isIOSAppOnVision;
-const NATIVE_VISION_CONTROLS_DETECTED = NATIVE_VISION_CONTROLS_STATUS === true;
 const FOLD_SESSION_CARDS = shouldFoldSessionCards({
   os: Platform.OS,
   isPad: Platform.OS === "ios" && Platform.isPad,
@@ -1665,6 +1658,7 @@ function CommandCenterScreen() {
       <StatusBar style={theme.dark ? "light" : "dark"} />
       <LegacyIPadShortcutCapture
         enabled={
+          !visionControlsEnabled &&
           ipadShortcutEnabled &&
           !hasNativeCJMUXKeyboardShortcuts &&
           !modalOpen
@@ -2100,7 +2094,7 @@ function LoginScreen() {
           style={[
             styles.primaryButton,
             styles.loginButton,
-            visionControls ? styles.visionSubmitButton : null,
+
           ]}
           disabled={auth.signingIn}
           onPress={() => {
@@ -3256,7 +3250,7 @@ function SettingsModal({
 
   return (
     <SheetModal visible={visible} title="Settings & updates" onClose={onClose}>
-      <NotificationSettings visible={visible} theme={theme} />
+      <NotificationSettings visible={visible} theme={theme} InputComponent={KeyboardTextInput} />
       <View style={styles.settingsSection}>
         <View style={styles.updateStatusCard}>
           <View style={styles.updateStatusIcon}>{statusIcon}</View>
@@ -3854,7 +3848,31 @@ function useLocalVoiceInput({
 }
 
 function KeyboardTextInput(props: TextInputProps) {
+  if (useVisionControls()) return <VisionTextField {...props} />;
   return <TextInput {...props} />;
+}
+
+// Forms that do not have a specialized voice field still never mount a native
+// input on Vision Pro. Explicit voice/clear buttons keep those fields usable.
+function VisionTextField(props: TextInputProps) {
+  const id = React.useId();
+  const [status, setStatus] = React.useState("");
+  const voice = useLocalVoiceInput({
+    scopeKey: id,
+    onText: text => props.onChangeText?.(props.maxLength ? text.slice(0, props.maxLength) : text),
+    onStatus: setStatus,
+    contextualStrings: [],
+  });
+  return <VoiceValueField
+    label={props.accessibilityLabel || props.placeholder || "Text"}
+    value={props.secureTextEntry && props.value ? "••••••" : props.value || ""}
+    emptyLabel={props.placeholder || "Speak to enter text"}
+    active={voice.active}
+    status={status}
+    disabled={props.editable === false}
+    onToggle={() => { void voice.toggle().catch(error => setStatus(String(error))); }}
+    onClear={() => props.onChangeText?.("")}
+  />;
 }
 
 function VoiceValueField({
@@ -3960,7 +3978,7 @@ function TerminalKeyboardSheet({
 
   return (
     <SheetModal visible={visible} title="Terminal keys" onClose={onClose}>
-      {onShortcut && !visionControls ? (
+      {onShortcut ? (
         <View style={styles.shortcutRow}>
           {PROMPT_SHORTCUTS.map((shortcut) => (
             <Pressable
@@ -3984,7 +4002,7 @@ function TerminalKeyboardSheet({
             accessibilityLabel={`Send ${entry.label} terminal key`}
             style={[
               styles.keyButton,
-              visionControls ? styles.visionKeyButton : null,
+
               entry.danger ? styles.keyButtonDanger : null,
             ]}
             disabled={disabled}
@@ -3996,7 +4014,7 @@ function TerminalKeyboardSheet({
             <Text
               style={[
                 styles.keyButtonText,
-                visionControls ? styles.visionKeyButtonText : null,
+
                 entry.danger ? styles.keyButtonTextDanger : null,
               ]}
             >
@@ -4094,7 +4112,7 @@ function PaneComposer({
   const standardVoiceRecording = voiceRecording ?? recognizing;
   const standardVoiceActive = standardVoiceRecording || voiceTranscribing || streamingActive;
   const standardActionDisabled = controlDisabled || standardVoiceActive;
-  const standardSendIsDisabled = sendIsDisabled || standardVoiceActive;
+  const standardSendIsDisabled = sendIsDisabled || standardVoiceRecording || voiceTranscribing || streamingMode === "connecting";
   const standardStatus = (standardVoiceRecording || voiceTranscribing) ? "" : status;
   const iconColor = controlDisabled ? theme.colors.textMuted : theme.colors.text;
   const activeIconColor = theme.colors.accent;
@@ -4156,7 +4174,7 @@ function PaneComposer({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={streamingControl.hint}
-      accessibilityHint="Tap once to start. Tap Stop to turn off the microphone; Send is separate."
+      accessibilityHint="Tap Start to dictate. Tap Stop to keep the text, or Send to stop and send it."
       accessibilityState={{ selected: streamingMode === "recording", disabled: streamingDisabled }}
       style={[
         expanded ? styles.paneComposerInlineButton : styles.paneComposerIconButton,
@@ -4240,7 +4258,19 @@ function PaneComposer({
       placeholder={placeholder}
       placeholderTextColor={theme.colors.textMuted}
     />
-  ) : null;
+  ) : (
+    <View style={[
+      styles.paneComposerInput,
+      expanded ? styles.paneComposerInputExpanded : styles.paneComposerInputCompact,
+      expanded ? styles.paneComposerInputEmbedded : null,
+      usesSingleShell ? styles.paneComposerInputSingleShell : null,
+      usesSingleShell && !singleShellPromptsVisible ? styles.paneComposerInputSingleShellCollapsed : null,
+    ]}>
+      <ScrollView><Text selectable style={{ color: value ? theme.colors.text : theme.colors.textMuted }}>
+        {value || "Tap Start to dictate"}
+      </Text></ScrollView>
+    </View>
+  );
 
   const sendButton = (
     <Pressable
@@ -4728,23 +4758,21 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
   );
 
   const sendCurrentText = React.useCallback(() => {
-    const value = text;
-    if (!target || sendText.isPending || !value.trim()) return;
-    clearSendFailure();
-    setStatus("Sending...");
-    sendText.mutate(
-      { agent: target, text: value, enter: true },
-      {
-        onSuccess: () => onClose(),
-        onError: (error) => {
-          setStatus("Send failed");
-          setSendError(error.message);
-          setRetryAction({ kind: "text", label: "Retry send" });
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        },
-      },
-    );
-  }, [clearSendFailure, onClose, sendText, target, text]);
+    if (!target || sendText.isPending) return;
+    void streamingInput.submit(async (value) => {
+      clearSendFailure();
+      setStatus("Sending...");
+      try {
+        await sendText.mutateAsync({ agent: target, text: value, enter: true });
+        onClose();
+      } catch (error) {
+        setStatus("Send failed");
+        setSendError(error instanceof Error ? error.message : String(error));
+        setRetryAction({ kind: "text", label: "Retry send" });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    });
+  }, [clearSendFailure, onClose, sendText, target, streamingInput.submit]);
 
   const retrySend = React.useCallback(() => {
     if (!retryAction) return;
@@ -4790,8 +4818,8 @@ function SendModal({ target, onClose }: { target: AgentSession | null; onClose: 
         voiceRecording={voiceInput.recording}
         voiceTranscribing={voiceInput.transcribing}
         disabled={!target}
-        sendDisabled={!text.trim()}
-        sendBusy={sendText.isPending}
+        sendDisabled={!text.trim() && !streamingInput.active}
+        sendBusy={sendText.isPending || streamingInput.sending}
         keyBusy={sendKey.isPending}
         uploadBusy={uploading}
         showUpload
@@ -4912,7 +4940,7 @@ function RenameModal({ target, onClose }: { target: AgentSession | null; onClose
       <Pressable
         style={[
           styles.primaryButton,
-          visionControls ? styles.visionSubmitButton : null,
+
           rename.isPending ? styles.disabledButton : null,
         ]}
         disabled={!target || rename.isPending || !name.trim()}
@@ -6091,41 +6119,23 @@ function WindowViewModal({
   const sendTerminalInput = React.useCallback((options?: { submit?: boolean }) => {
     if (!target || sendText.isPending || sendKey.isPending) return;
     const submit = options?.submit ?? true;
-    const value = terminalInput;
-    setStatus("Sending...");
-    if (!value) {
-      if (!submit) {
-        setStatus("");
-        return;
-      }
-      sendKey.mutate(
-        { agent: target, key: "Enter" },
-        {
-          onSuccess: afterTerminalSend,
-          onError: (err) => {
-            setStatus("Send failed");
-            setError(err.message);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          },
-        },
-      );
-      return;
-    }
-    sendText.mutate(
-      { agent: target, text: value, enter: submit },
-      {
-        onSuccess: () => {
+    void terminalStreamingInput.submit(async (value) => {
+      if (!value && !submit) return;
+      setStatus("Sending...");
+      try {
+        if (!value) await sendKey.mutateAsync({ agent: target, key: "Enter" });
+        else {
+          await sendText.mutateAsync({ agent: target, text: value, enter: submit });
           setTerminalInput("");
-          afterTerminalSend();
-        },
-        onError: (err) => {
-          setStatus("Send failed");
-          setError(err.message);
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        },
-      },
-    );
-  }, [afterTerminalSend, sendKey, sendText, target, terminalInput]);
+        }
+        afterTerminalSend();
+      } catch (err) {
+        setStatus("Send failed");
+        setError(err instanceof Error ? err.message : String(err));
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    }, true);
+  }, [afterTerminalSend, sendKey, sendText, target, terminalStreamingInput.submit]);
 
   const sendTerminalKey = React.useCallback(
     (entry: TerminalKeyEntry) => {
@@ -6496,7 +6506,7 @@ function WindowViewModal({
         voiceRecording={terminalVoiceInput.recording}
         voiceTranscribing={terminalVoiceInput.transcribing}
         disabled={!target}
-        sendBusy={sendText.isPending}
+        sendBusy={sendText.isPending || terminalStreamingInput.sending}
         keyBusy={sendKey.isPending}
         uploadBusy={terminalUploading}
         showUpload
@@ -7346,7 +7356,7 @@ function PinnedArtifactsModal({ visible, onClose }: { visible: boolean; onClose:
               style={[
                 styles.settingsSecondaryButton,
                 styles.pinRenameButton,
-                visionControls ? styles.visionSubmitButton : null,
+
                 renamePin.isPending ? styles.disabledButton : null,
               ]}
               disabled={renamePin.isPending}
@@ -7367,7 +7377,7 @@ function PinnedArtifactsModal({ visible, onClose }: { visible: boolean; onClose:
               style={[
                 styles.settingsPrimaryButton,
                 styles.pinRenameButton,
-                visionControls ? styles.visionSubmitButton : null,
+
                 renamePin.isPending || !renameName.trim() || renameName.trim() === renameTarget.name
                   ? styles.disabledButton
                   : null,
@@ -7854,7 +7864,7 @@ function StartAgentModal({
       <Pressable
         style={[
           styles.primaryButton,
-          visionControls ? styles.visionSubmitButton : null,
+
           startAgent.isPending ? styles.disabledButton : null,
         ]}
         disabled={startAgent.isPending || !machineId || !cwd.trim()}

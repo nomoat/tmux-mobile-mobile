@@ -51,6 +51,10 @@ type Capture = {
   stream?: NativeStream;
   recorder?: AudioRecorder;
   uri?: string;
+  text: string;
+  result: Promise<string | null>;
+  complete: (text: string | null) => void;
+  ready?: boolean;
   offset: number;
   cancelled: boolean;
   stopping?: boolean;
@@ -97,6 +101,10 @@ export function useStreamingDictation({
   onStatus: (status: string) => void;
 }) {
   const [mode, setMode] = React.useState<StreamingDictationMode>("idle");
+  const [sending, setSending] = React.useState(false);
+  const sendingRef = React.useRef(false);
+  const generation = React.useRef(0);
+  const mounted = React.useRef(true);
   const current = React.useRef<Capture | null>(null),
     pendingCleanup = React.useRef<Promise<void>>(Promise.resolve());
   const latest = React.useRef({ api, scopeKey, value, onChangeText, onStatus });
@@ -142,13 +150,19 @@ export function useStreamingDictation({
     return state.cleanup;
   }, []);
   const cancel = React.useCallback(() => {
+    generation.current += 1;
     const state = current.current;
     if (!state) return;
     current.current = null;
     state.cancelled = true;
+    state.complete(null);
     state.session?.cancel();
     void cleanup(state);
   }, [cleanup]);
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   React.useEffect(() => {
     setMode("idle");
     return cancel;
@@ -165,18 +179,16 @@ export function useStreamingDictation({
     });
     return () => subscription.remove();
   }, [cancel]);
-  const toggle = React.useCallback(async () => {
+  const finish = React.useCallback(async (): Promise<string | null> => {
     const active = current.current;
-    if (active) {
-      if (mode === "connecting") {
-        cancel();
-        setMode("idle");
-        latest.current.onStatus(
-          "Live dictation stopped. Your current text was kept.",
-        );
-        return;
-      }
-      if (active.stopping || mode !== "recording") return;
+    if (!active) return latest.current.value;
+    if (!active.ready) {
+      cancel();
+      setMode("idle");
+      latest.current.onStatus("Live dictation stopped. Your current text was kept.");
+      return null;
+    }
+    if (!active.stopping) {
       active.stopping = true;
       setMode("finishing");
       latest.current.onStatus("Microphone off · Finishing transcription…");
@@ -184,10 +196,35 @@ export function useStreamingDictation({
         await cleanup(active, true);
         if (!active.cancelled) active.session?.finish();
       } catch {
-        active.session?.cancel(
-          "Could not finish live dictation. Your current text was kept.",
-        );
+        active.session?.cancel("Could not finish live dictation. Your current text was kept.");
       }
+    }
+    return active.result;
+  }, [cancel, cleanup]);
+  const submit = React.useCallback(async (send: (text: string) => Promise<void>, allowEmpty = false) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    const requestGeneration = generation.current;
+    const requestScope = latest.current.scopeKey;
+    const wasActive = Boolean(current.current);
+    try {
+      const text = await finish();
+      if (text === null || !mounted.current || generation.current !== requestGeneration || latest.current.scopeKey !== requestScope) return;
+      if (!text.trim() && (wasActive || !allowEmpty)) {
+        latest.current.onStatus("No text to send");
+        return;
+      }
+      await send(text);
+    } finally {
+      sendingRef.current = false;
+      if (mounted.current) setSending(false);
+    }
+  }, [finish]);
+  const toggle = React.useCallback(async () => {
+    if (sendingRef.current) return;
+    if (current.current) {
+      await finish();
       return;
     }
     const config = latest.current;
@@ -202,7 +239,10 @@ export function useStreamingDictation({
         }) => NativeStream;
       }
     ).AudioStream;
+    let complete!: Capture["complete"];
+    const result = new Promise<string | null>(resolve => { complete = resolve; });
     const state: Capture = {
+      text: config.value, result, complete,
       offset: 0,
       cancelled: false,
       format: Stream ? "pcm16" : Platform.OS === "ios" ? "wav" : "aac",
@@ -242,8 +282,10 @@ export function useStreamingDictation({
               headers: { Authorization: `Bearer ${connection.token}` },
             }),
           onTranscript: (text) => {
-            if (valid())
-              latest.current.onChangeText(dictationText(config.value, text));
+            if (valid()) {
+              state.text = dictationText(config.value, text);
+              latest.current.onChangeText(state.text);
+            }
           },
           onEnd: (error) => {
             if (!valid()) return;
@@ -252,6 +294,7 @@ export function useStreamingDictation({
               current.current = null;
               setMode("idle");
               latest.current.onStatus(error || "Voice added");
+              state.complete(error ? null : state.text);
             });
           },
         });
@@ -342,8 +385,9 @@ export function useStreamingDictation({
             });
           }, 150);
         }
+        state.ready = true;
         setMode("recording");
-        latest.current.onStatus("Listening · Tap Stop to finish");
+        latest.current.onStatus("Listening · Stop to finish, or Send");
       } catch (error) {
         if (valid()) {
           cancel();
@@ -356,11 +400,13 @@ export function useStreamingDictation({
     })();
     await state.setup;
     if (!valid()) void cleanup(state);
-  }, [cancel, cleanup, mode]);
+  }, [cancel, cleanup, finish]);
   return {
     mode,
     active: mode !== "idle",
     busy: mode === "connecting" || mode === "finishing",
     toggle,
+    submit,
+    sending,
   };
 }

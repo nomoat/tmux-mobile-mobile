@@ -17,14 +17,13 @@ export type VisionFieldId = EditableFieldId | "terminal-output";
 export type FieldPresentation = "editable-text" | "voice" | "hidden" | "readonly";
 export type VisionControlsPreference = "auto" | "on";
 
-// Compatibility exports for old saved preferences. Every device now uses the
-// standard composer with the same explicit streaming Start/Stop control.
+// Detection is automatic. Ignore legacy forced-on settings on phones/tablets.
 
 export function resolveVisionControls(
   preference: VisionControlsPreference,
   detectedOnVision: boolean,
 ): boolean {
-  return false;
+  return detectedOnVision;
 }
 
 export function requiresVisionModeChoice(
@@ -39,7 +38,7 @@ export function resolveFieldPresentation(
   visionControls: boolean,
 ): FieldPresentation {
   if (field === "terminal-output") return "readonly";
-  return "editable-text";
+  return visionControls ? "voice" : "editable-text";
 }
 
 export function resolvePaneComposerPresentation({
@@ -52,7 +51,7 @@ export function resolvePaneComposerPresentation({
   showUpload: boolean;
 }) {
   return {
-    mountTextInput: true,
+    mountTextInput: !visionControls,
     showShortcuts,
     showUpload,
     showVoice: true,
