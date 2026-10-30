@@ -1,3 +1,4 @@
+import { SpeechSettings } from "@/tmux-mobile/speech-settings";
 import { streamingDictationControl, type StreamingDictationMode } from "@/tmux-mobile/streaming-asr-session";
 import { useStreamingDictation } from "@/tmux-mobile/use-streaming-dictation";
 import { CardActionBar, CardActionIcon } from "@/tmux-mobile/card-action-bar";
@@ -3236,6 +3237,7 @@ function SettingsModal({
 
   return (
     <SheetModal visible={visible} title="Settings & updates" onClose={onClose}>
+      <SpeechSettings visible={visible} theme={theme} />
       <NotificationSettings visible={visible} theme={theme} InputComponent={KeyboardTextInput} />
       <View style={styles.settingsSection}>
         <View style={styles.updateStatusCard}>

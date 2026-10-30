@@ -1,3 +1,5 @@
+import { ASR_PREFERENCE_KEY } from "./asr-provider";
+import { speechPreference } from "./speech-preference";
 import * as React from 'react';
 import { NATIVE_VISION_CONTROLS_DETECTED } from './vision-device';
 import { FpsModal as Modal } from './fps-monitor';
@@ -18,6 +20,7 @@ export function DraftsModal({ api, initialPath, theme, onClose, page = 'drafts' 
   theme: AppTheme;
   onClose: () => void;
 }) {
+  const speechMode = React.useSyncExternalStore(speechPreference.subscribe, speechPreference.getSnapshot);
   const title = page === 'terminal' ? 'Temporary terminal' : 'Drafts';
   const insets = useSafeAreaInsets();
   const browser = React.useRef<WebView>(null);
@@ -32,14 +35,14 @@ export function DraftsModal({ api, initialPath, theme, onClose, page = 'drafts' 
     setError('');
     setLoading(true);
     setCanGoBack(false);
-    api.browserHandoff(initialPath).then(handoff => {
+    Promise.all([api.browserHandoff(initialPath), speechPreference.load()]).then(([handoff]) => {
       if (active) setSource({ uri: validateDraftHandoff(api.baseUrl, handoff.handoffUrl) });
     }).catch(reason => {
       if (active) { setError(reason instanceof Error ? reason.message : String(reason)); setLoading(false); }
     });
     return () => { active = false; };
   }, [api, initialPath, attempt]);
-  const themeScript = `try { localStorage.setItem('tmux-mobile-theme', JSON.stringify({theme:${JSON.stringify(theme.dark ? 'dark' : 'kami')}})); document.documentElement.dataset.theme=${JSON.stringify(theme.dark ? 'dark' : 'kami')}; } catch (_) {} true;`;
+  const themeScript = `try { localStorage.setItem(${JSON.stringify(ASR_PREFERENCE_KEY)}, ${JSON.stringify(speechMode)}); localStorage.setItem('tmux-mobile-theme', JSON.stringify({theme:${JSON.stringify(theme.dark ? 'dark' : 'kami')}})); document.documentElement.dataset.theme=${JSON.stringify(theme.dark ? 'dark' : 'kami')}; } catch (_) {} true;`;
   React.useEffect(() => { browser.current?.injectJavaScript(themeScript); }, [themeScript]);
   const back = () => canGoBack ? browser.current?.goBack() : onClose();
   const control = (label: string, icon: React.ReactNode, onPress: () => void) => (

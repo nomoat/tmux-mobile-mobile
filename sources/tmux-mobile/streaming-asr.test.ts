@@ -28,6 +28,17 @@ class FakeSocket {
   }
 }
 describe("streaming dictation", () => {
+  it("sends the selected service and reports the actual service, including fallback events", async () => {
+    const socket = new FakeSocket(), providers: string[] = [];
+    const session = createStreamingAsrSession({ url: "wss://controller/api/asr/stream", providerMode: "wetype",
+      createSocket: () => socket as unknown as WebSocket, onProvider: provider => providers.push(provider) });
+    const ready = session.start(); socket.open();
+    expect(JSON.parse(socket.sent[0] as string).providerMode).toBe("wetype");
+    socket.message({ type: "provider", provider: "wetype" }); socket.message({ type: "ready" }); await ready;
+    socket.message({ type: "provider", provider: "invalid" });
+    socket.message({ type: "transcript", provider: "doubao", text: "hello" });
+    expect(providers).toEqual(["wetype", "doubao"]); session.cancel();
+  });
   it("replaces interim text, keeps the original draft and accepts final corrections", async () => {
     const socket = new FakeSocket(),
       texts: string[] = [],

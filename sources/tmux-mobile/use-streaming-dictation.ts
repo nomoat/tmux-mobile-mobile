@@ -1,4 +1,6 @@
 import * as React from "react";
+import { asrStatus } from "./asr-provider";
+import { speechPreference } from "./speech-preference";
 import { AppState, Platform } from "react-native";
 import {
   AudioModule,
@@ -52,6 +54,7 @@ type Capture = {
   recorder?: AudioRecorder;
   uri?: string;
   text: string;
+  provider: string;
   result: Promise<string | null>;
   complete: (text: string | null) => void;
   ready?: boolean;
@@ -191,7 +194,7 @@ export function useStreamingDictation({
     if (!active.stopping) {
       active.stopping = true;
       setMode("finishing");
-      latest.current.onStatus("Microphone off · Finishing transcription…");
+      latest.current.onStatus(asrStatus("finishing", active.provider));
       try {
         await cleanup(active, true);
         if (!active.cancelled) active.session?.finish();
@@ -242,7 +245,7 @@ export function useStreamingDictation({
     let complete!: Capture["complete"];
     const result = new Promise<string | null>(resolve => { complete = resolve; });
     const state: Capture = {
-      text: config.value, result, complete,
+      text: config.value, provider: "", result, complete,
       offset: 0,
       cancelled: false,
       format: Stream ? "pcm16" : Platform.OS === "ios" ? "wav" : "aac",
@@ -257,7 +260,9 @@ export function useStreamingDictation({
     state.setup = (async () => {
       try {
         await pendingCleanup.current;
+        await speechPreference.load();
         if (!valid()) return;
+        const providerMode = speechPreference.getSnapshot();
         if (Platform.OS === "ios" || Platform.OS === "android") {
           state.screenAwake = holdDictationScreenAwake();
           await state.screenAwake.ready;
@@ -277,6 +282,12 @@ export function useStreamingDictation({
         state.session = createStreamingAsrSession({
           url: url.toString(),
           format: state.format,
+          providerMode,
+          onProvider: provider => {
+            if (!valid()) return;
+            state.provider = provider;
+            if (state.ready) latest.current.onStatus(asrStatus(state.stopping ? "finishing" : "recording", provider));
+          },
           createSocket: (url) =>
             new NativeWebSocket(url, undefined, {
               headers: { Authorization: `Bearer ${connection.token}` },
@@ -293,7 +304,7 @@ export function useStreamingDictation({
               if (!valid()) return;
               current.current = null;
               setMode("idle");
-              latest.current.onStatus(error || "Voice added");
+              latest.current.onStatus(error || asrStatus("done", state.provider));
               state.complete(error ? null : state.text);
             });
           },
@@ -387,7 +398,7 @@ export function useStreamingDictation({
         }
         state.ready = true;
         setMode("recording");
-        latest.current.onStatus("Listening · Stop to finish, or Send");
+        latest.current.onStatus(asrStatus("recording", state.provider));
       } catch (error) {
         if (valid()) {
           cancel();

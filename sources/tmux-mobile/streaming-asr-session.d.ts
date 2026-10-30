@@ -23,6 +23,8 @@ export interface StreamingAsrSession {
 export function createStreamingAsrSession(options: {
   url: string;
   format?: "pcm16" | "wav" | "aac";
+  providerMode?: import("./asr-provider").AsrMode;
+  onProvider?: (provider: "doubao" | "wetype") => void;
   createSocket?: (url: string) => WebSocket;
   onTranscript?: (text: string, final: boolean) => void;
   onEnd?: (error?: string) => void;
