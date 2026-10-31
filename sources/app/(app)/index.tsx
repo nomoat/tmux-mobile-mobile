@@ -1,3 +1,4 @@
+import { CloseButton, VisionControlsContext, useVisionControls, controlIcon, VISION_TARGET_SIZE } from "@/tmux-mobile/interaction-controls";
 import { SpeechSettings } from "@/tmux-mobile/speech-settings";
 import { streamingDictationControl, type StreamingDictationMode } from "@/tmux-mobile/streaming-asr-session";
 import { useStreamingDictation } from "@/tmux-mobile/use-streaming-dictation";
@@ -386,7 +387,6 @@ type AppStyles = ReturnType<typeof createStyles>;
 
 const ThemeContext = React.createContext<AppTheme>(lightTheme);
 const StylesContext = React.createContext<AppStyles>(createStyles(lightTheme));
-const VisionControlsContext = React.createContext(false);
 const FontScaleContext = React.createContext(1);
 
 const PROMPT_SHORTCUTS = [
@@ -517,10 +517,6 @@ function useAppTheme() {
 
 function useAppStyles() {
   return React.useContext(StylesContext);
-}
-
-function useVisionControls() {
-  return React.useContext(VisionControlsContext);
 }
 
 function useFontScale() {
@@ -886,7 +882,7 @@ function CommandCenterScreen() {
     [fontScale, windowHeight, windowWidth],
   );
   const styles = React.useMemo(
-    () => createStyles(theme, layout, fontScale),
+    () => createStyles(theme, layout, fontScale, NATIVE_VISION_CONTROLS_DETECTED),
     [fontScale, layout, theme],
   );
   const relativeTimeNow = Date.now();
@@ -2197,7 +2193,7 @@ function Chip({
 }) {
   const styles = useAppStyles();
   return (
-    <Pressable style={[styles.chip, active ? styles.chipActive : null]} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} style={[styles.chip, active ? styles.chipActive : null]} onPress={onPress}>
       {typeof children === "string" ? (
         <Text style={[styles.chipText, active ? styles.chipTextActive : null]} numberOfLines={1}>{children}</Text>
       ) : (
@@ -2791,6 +2787,7 @@ function SectionActionButton({
   disabled?: boolean;
 }) {
   const styles = useAppStyles();
+  const vision = useVisionControls();
   return (
     <Pressable
       accessibilityRole="button"
@@ -2804,7 +2801,7 @@ function SectionActionButton({
       ]}
       onPress={onPress}
     >
-      {icon}
+      {controlIcon(icon, vision)}
     </Pressable>
   );
 }
@@ -2825,6 +2822,7 @@ function ActionButton({
   stopPropagation?: boolean;
 }) {
   const styles = useAppStyles();
+  const vision = useVisionControls();
   return (
     <Pressable
       accessibilityRole="button"
@@ -2842,7 +2840,7 @@ function ActionButton({
         onPress();
       }}
     >
-      {icon}
+      {controlIcon(icon, vision)}
     </Pressable>
   );
 }
@@ -2857,9 +2855,10 @@ function IconButton({
   onPress: () => void;
 }) {
   const styles = useAppStyles();
+  const vision = useVisionControls();
   return (
-    <Pressable accessibilityLabel={label} style={styles.iconButton} onPress={onPress}>
-      {icon}
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={styles.iconButton} onPress={onPress}>
+      {controlIcon(icon, vision)}
     </Pressable>
   );
 }
@@ -3055,6 +3054,7 @@ function CommandMenu({
 }) {
   const theme = useAppTheme();
   const styles = useAppStyles();
+  const vision = useVisionControls();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   return (
@@ -3062,6 +3062,7 @@ function CommandMenu({
       <View style={styles.menuLayer}>
         <Pressable accessibilityLabel="Close command menu" style={styles.menuBackdrop} onPress={onClose} />
         <View style={[styles.menuPanel, { marginTop: topOffset, maxHeight: Math.max(140, height - topOffset - insets.bottom - 12) }]} >
+          {vision ? <View style={{ padding: 12, alignItems: "flex-end" }}><CloseButton theme={theme} accessibilityLabel="Close command menu" onPress={onClose} /></View> : null}
           <ScrollView bounces={false} style={{ flexGrow: 0 }}>
           <MenuAction
             icon={<Play size={18} color={theme.colors.accent} />}
@@ -3898,7 +3899,7 @@ function VoiceValueField({
 }) {
   const theme = useAppTheme();
   const styles = useAppStyles();
-  const clearDisabled = disabled || !value;
+  const clearDisabled = disabled || active || !value;
 
   return (
     <View style={styles.visionVoiceField}>
@@ -3949,7 +3950,8 @@ function VoiceValueField({
             disabled={clearDisabled}
             onPress={onClear}
           >
-            <X size={22} color={clearDisabled ? theme.colors.textMuted : theme.colors.text} />
+            <X size={26} color={clearDisabled ? theme.colors.textMuted : theme.colors.text} />
+            <Text style={styles.visionVoiceButtonText}>Clear</Text>
           </Pressable>
         ) : null}
       </View>
@@ -4132,7 +4134,7 @@ function PaneComposer({
   const [snippetNewText, setSnippetNewText] = React.useState("");
   const [singleShellPromptsExpanded, setSingleShellPromptsExpanded] = React.useState(false);
   const singleShellPromptsVisible = usesSingleShell && singleShellPromptsExpanded;
-  const singleShellExpandedHeight = Math.max(180, Math.round(viewportHeight * 0.5));
+  const singleShellExpandedHeight = Math.max(visionControls ? 280 : 180, Math.round(viewportHeight * 0.5));
   const snippetItems = React.useMemo(() => {
     const loaded = cleanSnippetItems(snippets.data?.items);
     return prioritizeGoalSnippet(
@@ -4171,7 +4173,7 @@ function PaneComposer({
 
   const streamingControl = streamingDictationControl(streamingMode);
   const streamingDisabled = controlDisabled || recognizing || streamingControl.disabled;
-  const streamingColor = streamingMode === "recording" ? "#fff" : iconColor;
+  const streamingColor = streamingMode === "recording" ? "#fff" : theme.colors.surfaceRaised;
   const streamingButton = onToggleStreaming ? (
     <Pressable
       accessibilityRole="button"
@@ -4179,7 +4181,6 @@ function PaneComposer({
       accessibilityHint="Tap Start to dictate. Tap Stop to keep the text, or Send to stop and send it."
       accessibilityState={{ selected: streamingMode === "recording", disabled: streamingDisabled }}
       style={[
-        expanded ? styles.paneComposerInlineButton : styles.paneComposerIconButton,
         styles.streamingDictationButton,
         streamingMode === "recording" ? styles.streamingDictationRecording : null,
         streamingDisabled ? styles.disabledButton : null,
@@ -4188,9 +4189,9 @@ function PaneComposer({
       onPress={onToggleStreaming}
     >
       {streamingControl.icon === "spinner" ? <ActivityIndicator size="small" color={streamingColor} />
-        : streamingControl.icon === "stop" ? <Square size={14} color={streamingColor} fill={streamingColor} />
-        : streamingControl.icon === "cancel" ? <X size={16} color={streamingColor} />
-        : <AudioLines size={16} color={streamingColor} />}
+        : streamingControl.icon === "stop" ? <Square size={visionControls ? 26 : 22} color={streamingColor} fill={streamingColor} />
+        : streamingControl.icon === "cancel" ? <X size={visionControls ? 26 : 22} color={streamingColor} />
+        : <AudioLines size={visionControls ? 28 : 24} color={streamingColor} />}
       <Text style={[styles.streamingDictationLabel, { color: streamingColor }]}>{streamingControl.label}</Text>
     </Pressable>
   ) : null;
@@ -4206,7 +4207,7 @@ function PaneComposer({
       onPress={onOpenKeys}
     >
       <Terminal
-        size={16}
+        size={visionControls ? 26 : 16}
         color={standardActionDisabled ? theme.colors.textMuted : theme.colors.text}
       />
     </Pressable>
@@ -4227,7 +4228,7 @@ function PaneComposer({
           <ActivityIndicator color={theme.colors.text} />
         ) : (
           <Upload
-            size={16}
+            size={visionControls ? 26 : 16}
             color={disabled || standardVoiceActive ? theme.colors.textMuted : theme.colors.text}
           />
         )}
@@ -4240,7 +4241,7 @@ function PaneComposer({
       editable={!streamingActive && !disabled}
       onChangeText={onChangeText}
       multiline={multiline ?? expanded}
-      autoFocus={autoFocus}
+      autoFocus={autoFocus && !onToggleStreaming}
       autoCapitalize="none"
       autoCorrect={false}
       returnKeyType="send"
@@ -4268,7 +4269,7 @@ function PaneComposer({
       usesSingleShell ? styles.paneComposerInputSingleShell : null,
       usesSingleShell && !singleShellPromptsVisible ? styles.paneComposerInputSingleShellCollapsed : null,
     ]}>
-      <ScrollView><Text selectable style={{ color: value ? theme.colors.text : theme.colors.textMuted }}>
+      <ScrollView><Text selectable accessibilityLabel="Dictation draft" style={[styles.visionDraftPreviewText, { color: value ? theme.colors.text : theme.colors.textMuted }]}>
         {value || "Tap Start to dictate"}
       </Text></ScrollView>
     </View>
@@ -4276,7 +4277,8 @@ function PaneComposer({
 
   const sendButton = (
     <Pressable
-      accessibilityLabel="Send terminal input"
+      accessibilityRole="button"
+      accessibilityLabel={streamingActive ? "Stop dictation and send terminal input" : "Send terminal input"}
       style={[
         expanded ? styles.paneComposerInlineSendButton : styles.paneComposerSendButton,
         standardSendIsDisabled ? styles.disabledButton : null,
@@ -4287,10 +4289,11 @@ function PaneComposer({
       {sendBusy || keyBusy ? (
         <ActivityIndicator color={theme.colors.surfaceRaised} />
       ) : expanded ? (
-        <Send size={16} color={theme.colors.surfaceRaised} />
+        <Send size={visionControls ? 26 : 18} color={theme.colors.surfaceRaised} />
       ) : (
-        <Send size={17} color={theme.colors.surfaceRaised} />
+        <Send size={visionControls ? 26 : 18} color={theme.colors.surfaceRaised} />
       )}
+      {visionControls ? <Text style={styles.visionComposerSendText}>Send</Text> : null}
     </Pressable>
   );
 
@@ -4310,7 +4313,7 @@ function PaneComposer({
         }}
       >
         <X
-          size={16}
+          size={visionControls ? 26 : 16}
           color={value.length === 0 ? theme.colors.textMuted : theme.colors.text}
         />
       </Pressable>
@@ -4369,7 +4372,7 @@ function PaneComposer({
         disabled={disabled || standardVoiceActive}
         onPress={openSnippetManager}
       >
-        <ListPlus size={16} color={theme.colors.text} />
+        <ListPlus size={visionControls ? 26 : 16} color={theme.colors.text} />
       </Pressable>
     </View>
   ) : null;
@@ -4395,15 +4398,16 @@ function PaneComposer({
       }}
     >
       {singleShellPromptsVisible ? (
-        <Minimize2 size={17} color={activeIconColor} />
+        <Minimize2 size={visionControls ? 26 : 17} color={activeIconColor} />
       ) : (
-        <Maximize2 size={17} color={theme.colors.text} />
+        <Maximize2 size={visionControls ? 26 : 17} color={theme.colors.text} />
       )}
     </Pressable>
   ) : null;
 
   return (
     <View style={[styles.paneComposer, usesSingleShell ? styles.paneComposerSingleShell : null]}>
+      {streamingButton}
       {!usesSingleShell ? shortcutsBar : null}
       {expanded ? (
         <>
@@ -4421,7 +4425,7 @@ function PaneComposer({
             {singleShellPromptsVisible ? shortcutsBar : null}
             {input}
             {usesSingleShell && (standardStatus || error) ? (
-              <Text style={styles.paneComposerEmbeddedStatus} numberOfLines={1}>
+              <Text style={styles.paneComposerEmbeddedStatus} numberOfLines={visionControls ? 3 : 2}>
                 {standardStatus || error}
               </Text>
             ) : null}
@@ -4435,12 +4439,11 @@ function PaneComposer({
               {keysButton}
               {promptToggleButton}
               {clearButton}
-              {streamingButton}
               {sendButton}
             </View>
           </View>
           {!usesSingleShell && (reserveStatusSpace || standardStatus || error) ? (
-            <Text style={styles.paneComposerStatus} numberOfLines={1}>
+            <Text style={styles.paneComposerStatus} numberOfLines={visionControls ? 3 : 2}>
               {standardStatus || error || ""}
             </Text>
           ) : null}
@@ -4462,7 +4465,6 @@ function PaneComposer({
         </>
       ) : (
         <View style={styles.paneComposerCompactRow}>
-          {streamingButton}
           {keysButton}
           {input}
           {sendButton}
@@ -8136,9 +8138,7 @@ function SheetModal({
                     <Text style={styles.sheetTitle} numberOfLines={1}>
                       {title}
                     </Text>
-                    <Pressable accessibilityLabel={`Close ${title}`} style={styles.iconButton} onPress={closeSheet}>
-                      <X size={18} color={theme.colors.text} />
-                    </Pressable>
+                    <CloseButton accessibilityLabel={`Close ${title}`} theme={theme} onPress={closeSheet} />
                   </View>
                 </View>
               )}
@@ -8332,7 +8332,9 @@ function createStyles(
   theme: AppTheme,
   layout: ResponsiveLayout = DEFAULT_LAYOUT,
   fontScale = 1,
+  visionControls = false,
 ) {
+  const target = VISION_TARGET_SIZE;
   const definitions = StyleSheet.create({
   screen: {
     flex: 1,
@@ -8353,10 +8355,12 @@ function createStyles(
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: visionControls ? "wrap" : "nowrap",
+    rowGap: 12,
   },
   headerBrand: {
     flex: 1,
-    minWidth: 0,
+    minWidth: visionControls ? 180 : 0,
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
@@ -8395,17 +8399,17 @@ function createStyles(
   },
   headerButtons: {
     flexDirection: "row",
-    gap: 8,
-    marginLeft: 12,
+    gap: visionControls ? 12 : 8,
+    marginLeft: visionControls ? 0 : 12,
   },
   iconButton: {
     flexShrink: 0,
-    width: 38,
-    height: 38,
-    borderRadius: theme.radii.full,
+    width: visionControls ? target : 38,
+    height: visionControls ? target : 38,
+    borderRadius: visionControls ? 16 : theme.radii.full,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "transparent",
+    backgroundColor: visionControls ? theme.colors.surfaceRaised : "transparent",
   },
 	  machineStripViewport: {
 	    width: "100%",
@@ -8413,38 +8417,41 @@ function createStyles(
 	    alignSelf: "center",
 	    flexGrow: 0,
 	    flexShrink: 0,
-	    maxHeight: 50,
+	    maxHeight: visionControls ? 92 : 50,
 	  },
 	  machineStrip: {
-	    gap: 4,
+	    gap: visionControls ? 12 : 4,
 	    paddingHorizontal: layout.gutter,
-	    paddingVertical: 6,
+	    paddingVertical: visionControls ? 12 : 6,
     alignItems: "center",
     flexGrow: 0,
   },
 	  chip: {
-	    height: 32,
-	    maxWidth: 220,
+	    height: visionControls ? target : 32,
+	    maxWidth: visionControls ? 300 : 220,
     flexGrow: 0,
     flexShrink: 0,
     alignSelf: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: visionControls ? 20 : 10,
     borderRadius: theme.radii.full,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: "transparent",
+    backgroundColor: visionControls ? theme.colors.surfaceRaised : "transparent",
     alignItems: "center",
     justifyContent: "center",
+    minWidth: visionControls ? 96 : 0,
   },
   chipActive: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border,
+    backgroundColor: visionControls ? theme.colors.accentSoft : theme.colors.surfaceRaised,
+    borderColor: visionControls ? theme.colors.accent : theme.colors.border,
   },
   chipText: {
     ...theme.typography.meta,
     color: theme.colors.textMuted,
     flexShrink: 1,
     minWidth: 0,
+    fontSize: visionControls ? 18 : theme.typography.meta.fontSize,
+    lineHeight: visionControls ? 24 : theme.typography.meta.lineHeight,
   },
 	  chipTextActive: {
 	    color: theme.colors.text,
@@ -8453,8 +8460,8 @@ function createStyles(
 	  machineChipContent: {
 	    flexDirection: "row",
 	    alignItems: "center",
-	    gap: 6,
-	    maxWidth: 196,
+	    gap: visionControls ? 12 : 6,
+	    maxWidth: visionControls ? 260 : 196,
 	    minWidth: 0,
 	  },
 	  machineChipWorkingDot: {
@@ -8483,7 +8490,7 @@ function createStyles(
   primaryButton: {
     width: "100%",
     minWidth: 0,
-    minHeight: 42,
+    minHeight: visionControls ? target : 42,
     paddingHorizontal: 14,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.accent,
@@ -8542,7 +8549,7 @@ function createStyles(
     color: theme.colors.textMuted,
   },
   updateBannerAction: {
-    minHeight: 34,
+    minHeight: visionControls ? target : 34,
     paddingHorizontal: 10,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
@@ -8556,9 +8563,9 @@ function createStyles(
     fontFamily: "Lato_700Bold",
   },
   updateBannerClose: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radii.lg,
+    width: visionControls ? target : 32,
+    height: visionControls ? target : 32,
+    borderRadius: visionControls ? 16 : theme.radii.lg,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -8776,9 +8783,9 @@ function createStyles(
 	    paddingVertical: 4,
 	  },
 	  sessionRowIconButton: {
-	    width: 34,
-	    height: 34,
-	    borderRadius: theme.radii.md,
+	    width: visionControls ? target : 34,
+	    height: visionControls ? target : 34,
+	    borderRadius: visionControls ? 16 : theme.radii.md,
 	    alignItems: "center",
 	    justifyContent: "center",
 	  },
@@ -9015,6 +9022,8 @@ function createStyles(
     justifyContent: "space-between",
     gap: 8,
     marginBottom: 3,
+    flexWrap: "wrap",
+    rowGap: 12,
   },
   cardSectionHeadingText: {
     minWidth: 0,
@@ -9024,10 +9033,11 @@ function createStyles(
     gap: 7,
   },
   cardSectionActions: {
-    flexShrink: 0,
+    flexShrink: visionControls ? 1 : 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: visionControls ? 12 : 5,
+    flexWrap: "wrap",
   },
   cardSectionLabel: {
     ...theme.typography.meta,
@@ -9057,18 +9067,18 @@ function createStyles(
 	    textDecorationLine: "underline",
 	  },
   sectionActionButton: {
-    width: 24,
-    height: 24,
-    borderRadius: theme.radii.md,
-    backgroundColor: "transparent",
+    width: visionControls ? target : 24,
+    height: visionControls ? target : 24,
+    borderRadius: visionControls ? 16 : theme.radii.md,
+    backgroundColor: visionControls ? theme.colors.surfaceRaised : "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radii.md,
-    backgroundColor: "transparent",
+    width: visionControls ? target : 32,
+    height: visionControls ? target : 32,
+    borderRadius: visionControls ? 16 : theme.radii.md,
+    backgroundColor: visionControls ? theme.colors.surfaceRaised : "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -9082,9 +9092,9 @@ function createStyles(
 	  sessionListFab: {
 	    position: "absolute",
 	    right: Math.max(layout.gutter, (layout.width - layout.contentMaxWidth) / 2 + layout.gutter),
-	    width: 52,
-	    height: 52,
-	    borderRadius: 26,
+	    width: visionControls ? target : 52,
+	    height: visionControls ? target : 52,
+	    borderRadius: visionControls ? 16 : 26,
 	    alignItems: "center",
 	    justifyContent: "center",
 	    backgroundColor: theme.colors.accent,
@@ -9107,13 +9117,13 @@ function createStyles(
     backgroundColor: "rgba(0, 0, 0, 0.08)",
   },
 	  menuPanel: {
-	    width: layout.menuWidth,
+	    width: visionControls ? Math.min(layout.width - layout.gutter * 2, 360) : layout.menuWidth,
 	    marginRight: layout.gutter,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceRaised,
-    paddingVertical: 6,
+    paddingVertical: visionControls ? 12 : 6,
     shadowColor: "#000000",
     shadowOpacity: 0.16,
     shadowRadius: 14,
@@ -9121,10 +9131,10 @@ function createStyles(
     elevation: 8,
   },
   menuAction: {
-    minHeight: 44,
+    minHeight: visionControls ? target : 44,
     paddingHorizontal: 12,
     flexDirection: "row",
-    gap: 10,
+    gap: visionControls ? 16 : 10,
     alignItems: "center",
   },
   menuActionIcon: {
@@ -9157,15 +9167,15 @@ function createStyles(
     width: "100%",
   },
   cardSearchListContent: {
-    gap: 8,
+    gap: visionControls ? 12 : 8,
     paddingBottom: 12,
   },
   cardSearchResult: {
-    minHeight: 58,
+    minHeight: visionControls ? 80 : 58,
     width: "100%",
     minWidth: 0,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: visionControls ? 20 : 12,
+    paddingVertical: visionControls ? 16 : 9,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -9233,7 +9243,7 @@ function createStyles(
   },
   fontScaleButton: {
     width: 64,
-    minHeight: 56,
+    minHeight: visionControls ? target : 56,
     flexShrink: 0,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
@@ -9336,11 +9346,12 @@ function createStyles(
     minWidth: 0,
     flexDirection: "row",
     gap: 10,
+    flexWrap: "wrap",
   },
   settingsPrimaryButton: {
     flex: 1,
     minWidth: 0,
-    minHeight: 42,
+    minHeight: visionControls ? target : 42,
     paddingHorizontal: 14,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.accent,
@@ -9352,7 +9363,7 @@ function createStyles(
   settingsSecondaryButton: {
     flex: 1,
     minWidth: 0,
-    minHeight: 42,
+    minHeight: visionControls ? target : 42,
     paddingHorizontal: 14,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
@@ -9754,14 +9765,14 @@ function createStyles(
   visionVoiceActionRow: {
     width: "100%",
     minWidth: 0,
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "stretch",
-    gap: 8,
+    gap: 12,
   },
   visionVoiceButton: {
-    flex: 1,
+    flex: 0,
     minWidth: 0,
-    minHeight: 52,
+    minHeight: 80,
     paddingHorizontal: 12,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
@@ -9771,6 +9782,7 @@ function createStyles(
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    width: "100%",
   },
   visionVoiceButtonActive: {
     borderColor: theme.colors.accent,
@@ -9784,8 +9796,10 @@ function createStyles(
     color: theme.colors.accent,
   },
   visionVoiceClearButton: {
-    width: 52,
-    height: 52,
+    flexDirection: "row",
+    gap: 10,
+    width: 132,
+    height: target,
     flexShrink: 0,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
@@ -9793,17 +9807,18 @@ function createStyles(
     backgroundColor: theme.colors.surfaceRaised,
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "flex-end",
   },
   paneComposer: {
     width: "100%",
     minWidth: 0,
-    gap: 8,
+    gap: visionControls ? 12 : 10,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
   },
   paneComposerSingleShell: {
-    gap: 6,
+    gap: visionControls ? 12 : 10,
   },
   visionPaneComposer: {
     width: "100%",
@@ -9995,7 +10010,7 @@ function createStyles(
     minHeight: 108,
   },
   paneComposerInputShellSingleCollapsed: {
-    minHeight: 56,
+    minHeight: visionControls ? 160 : 112,
   },
   paneComposerInput: {
     flex: 1,
@@ -10012,7 +10027,7 @@ function createStyles(
     borderWidth: 0,
     borderRadius: 0,
     backgroundColor: "transparent",
-    paddingBottom: 64,
+    paddingBottom: 12,
   },
   paneComposerInputCompact: {
     height: 44,
@@ -10025,19 +10040,19 @@ function createStyles(
   },
   paneComposerInputSingleShell: {
     minHeight: 108,
-    paddingTop: 40,
-    paddingBottom: 50,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   paneComposerInputSingleShellCollapsed: {
-    minHeight: 56,
+    minHeight: visionControls ? 72 : 56,
     paddingTop: 10,
-    paddingRight: 256,
+    paddingRight: 12,
     paddingBottom: 10,
   },
   paneComposerIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radii.full,
+    width: visionControls ? target : 44,
+    height: visionControls ? target : 44,
+    borderRadius: visionControls ? 16 : theme.radii.full,
     backgroundColor: theme.colors.surfaceRaised,
     alignItems: "center",
     justifyContent: "center",
@@ -10061,45 +10076,58 @@ function createStyles(
     backgroundColor: theme.colors.accentSoft,
   },
   paneComposerInlineActions: {
-    position: "absolute",
-    right: 8,
-    bottom: 8,
+    position: "relative",
+    right: 0,
+    bottom: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: visionControls ? 12 : 8,
+    padding: 8,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   paneComposerInlineActionsSingle: {
-    right: 6,
-    bottom: 6,
-    gap: 6,
+    right: 0,
+    bottom: 0,
+    gap: visionControls ? 12 : 8,
   },
   paneComposerEmbeddedStatus: {
-    position: "absolute",
-    left: 8,
-    right: 256,
-    bottom: 20,
+    position: "relative",
+    left: 0,
+    right: 0,
+    bottom: 0,
     ...theme.typography.meta,
     color: theme.colors.textMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   paneComposerInlineButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radii.full,
+    width: visionControls ? target : 44,
+    height: visionControls ? target : 44,
+    borderRadius: visionControls ? 16 : theme.radii.full,
     backgroundColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   streamingDictationButton: {
-    width: 76,
+    width: "100%",
     flexDirection: "row",
-    gap: 4,
+    gap: 12,
+    minHeight: visionControls ? 80 : 64,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   streamingDictationRecording: {
     backgroundColor: "#b3261e",
   },
   streamingDictationLabel: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: visionControls ? 22 : 18,
+    fontWeight: "700",
   },
   paneComposerInlineButtonActive: {
     borderColor: theme.colors.accent,
@@ -10113,31 +10141,37 @@ function createStyles(
     color: theme.colors.accent,
   },
   paneComposerStatus: {
-    flex: 1,
+    flex: 0,
     minWidth: 0,
     ...theme.typography.meta,
     color: theme.colors.textMuted,
   },
   paneComposerSendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radii.full,
+    width: visionControls ? 112 : 44,
+    height: visionControls ? target : 44,
+    borderRadius: visionControls ? 16 : theme.radii.full,
     backgroundColor: theme.colors.accent,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginLeft: "auto",
   },
   paneComposerInlineSendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radii.full,
+    width: visionControls ? 112 : 44,
+    height: visionControls ? target : 44,
+    borderRadius: visionControls ? 16 : theme.radii.full,
     backgroundColor: theme.colors.accent,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginLeft: "auto",
   },
   paneComposerSubmitButton: {
     width: "100%",
     minWidth: 0,
-    minHeight: 44,
+    minHeight: visionControls ? target : 44,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.accent,
     paddingHorizontal: 14,
@@ -10155,7 +10189,7 @@ function createStyles(
     minWidth: 0,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: visionControls ? 12 : 8,
   },
   snippetBar: {
     width: "100%",
@@ -10166,14 +10200,15 @@ function createStyles(
     gap: 8,
   },
   snippetBarEmbedded: {
-    position: "absolute",
-    width: "auto",
-    top: 5,
-    right: 6,
-    left: 6,
+    position: "relative",
+    width: "100%",
+    top: 0,
+    right: 0,
+    left: 0,
     zIndex: 1,
     minHeight: 34,
-    gap: 6,
+    gap: visionControls ? 12 : 8,
+    padding: 8,
   },
   snippetScroll: {
     flex: 1,
@@ -10185,7 +10220,7 @@ function createStyles(
     paddingRight: 2,
   },
   shortcutChip: {
-    minHeight: 34,
+    minHeight: visionControls ? target : 34,
     maxWidth: 180,
     paddingHorizontal: 12,
     borderRadius: theme.radii.full,
@@ -10197,11 +10232,13 @@ function createStyles(
   shortcutText: {
     ...theme.typography.meta,
     color: theme.colors.text,
+    fontSize: visionControls ? 18 : theme.typography.meta.fontSize,
+    lineHeight: visionControls ? 24 : theme.typography.meta.lineHeight,
   },
   snippetIconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: theme.radii.full,
+    width: visionControls ? target : 34,
+    height: visionControls ? target : 34,
+    borderRadius: visionControls ? 16 : theme.radii.full,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceRaised,
@@ -10214,7 +10251,8 @@ function createStyles(
     minHeight: 42,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: visionControls ? 12 : 8,
+    flexWrap: visionControls ? "wrap" : "nowrap",
   },
   snippetRowInput: {
     flex: 1,
@@ -10229,9 +10267,9 @@ function createStyles(
     ...theme.typography.body,
   },
   snippetRowIconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: theme.radii.lg,
+    width: visionControls ? target : 38,
+    height: visionControls ? target : 38,
+    borderRadius: visionControls ? 16 : theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceRaised,
@@ -10244,7 +10282,8 @@ function createStyles(
     minHeight: 42,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: visionControls ? 12 : 8,
+    flexWrap: visionControls ? "wrap" : "nowrap",
   },
   snippetAddInput: {
     flex: 1,
@@ -10268,7 +10307,7 @@ function createStyles(
   },
   uploadChoiceButton: {
     width: "100%",
-    minHeight: 62,
+    minHeight: visionControls ? target : 62,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -10338,7 +10377,7 @@ function createStyles(
     color: theme.colors.danger,
   },
   retryButton: {
-    minHeight: 34,
+    minHeight: visionControls ? target : 34,
     flexShrink: 0,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.danger,
@@ -10358,11 +10397,11 @@ function createStyles(
     minWidth: 0,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: visionControls ? 12 : 8,
   },
   keyButton: {
-    minWidth: 46,
-    height: 36,
+    minWidth: visionControls ? target : 46,
+    height: visionControls ? target : 36,
     paddingHorizontal: 10,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
@@ -10382,6 +10421,8 @@ function createStyles(
   keyButtonText: {
     ...theme.typography.meta,
     color: theme.colors.text,
+    fontSize: visionControls ? 18 : theme.typography.meta.fontSize,
+    lineHeight: visionControls ? 24 : theme.typography.meta.lineHeight,
   },
   visionKeyButtonText: {
     ...theme.typography.section,
@@ -10460,7 +10501,7 @@ function createStyles(
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    minHeight: 44,
+    minHeight: visionControls ? 80 : 44,
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.border,
@@ -10630,7 +10671,8 @@ function createStyles(
     flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: visionControls ? 12 : 8,
+    flexWrap: "wrap",
   },
   sessionZoomLabel: {
     ...theme.typography.meta,
@@ -10640,17 +10682,17 @@ function createStyles(
     fontVariant: ["tabular-nums"],
   },
   sessionFilesButton: {
-    width: 44,
-    height: 44,
+    width: visionControls ? target : 44,
+    height: visionControls ? target : 44,
     flexShrink: 0,
-    borderRadius: theme.radii.md,
+    borderRadius: visionControls ? 16 : theme.radii.md,
     backgroundColor: theme.colors.surfaceRaised,
     alignItems: "center",
     justifyContent: "center",
   },
   sessionFollowButton: {
-    minWidth: 74,
-    height: 32,
+    minWidth: visionControls ? 108 : 74,
+    height: visionControls ? target : 32,
     flexShrink: 0,
     paddingHorizontal: 10,
     borderRadius: theme.radii.md,
@@ -10725,10 +10767,10 @@ function createStyles(
     borderBottomColor: theme.colors.border,
   },
   fileBrowserIconButton: {
-    width: 44,
-    height: 44,
+    width: visionControls ? target : 44,
+    height: visionControls ? target : 44,
     flexShrink: 0,
-    borderRadius: theme.radii.md,
+    borderRadius: visionControls ? 16 : theme.radii.md,
     backgroundColor: theme.colors.surfaceRaised,
     alignItems: "center",
     justifyContent: "center",
@@ -10759,7 +10801,7 @@ function createStyles(
     flexGrow: 1,
   },
   fileBrowserRow: {
-    minHeight: 54,
+    minHeight: visionControls ? target : 54,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -10806,7 +10848,7 @@ function createStyles(
   },
   fileBrowserRetryButton: {
     minWidth: 88,
-    minHeight: 44,
+    minHeight: visionControls ? target : 44,
     borderRadius: theme.radii.md,
     backgroundColor: theme.colors.surfaceRaised,
     alignItems: "center",
@@ -10839,7 +10881,7 @@ function createStyles(
     gap: 10,
   },
   pinRenameButton: {
-    minHeight: 48,
+    minHeight: visionControls ? target : 48,
   },
   pinsViewport: {
     flex: 1,
@@ -10951,7 +10993,7 @@ function createStyles(
   segment: {
     flex: 1,
     minWidth: 0,
-    minHeight: 40,
+    minHeight: visionControls ? target : 40,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -11003,7 +11045,7 @@ function createStyles(
   visionMuxButton: {
     flexGrow: 1,
     minWidth: 96,
-    minHeight: 60,
+    minHeight: visionControls ? target : 60,
     paddingHorizontal: 16,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
